@@ -1,0 +1,8 @@
+node_modules/
+.expo/
+.env
+.vercel/
+dist/
+*.log
+web-build/
+package-lock.json

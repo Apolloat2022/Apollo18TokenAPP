@@ -1,0 +1,162 @@
+import { View, Text, ScrollView, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
+import { styled } from 'dripsy';
+
+const Container = styled(View)({
+  flex: 1,
+  backgroundColor: 'background',
+});
+
+const Content = styled(ScrollView)({
+  flex: 1,
+  padding: 24,
+});
+
+const HeroSection = styled(View)({
+  alignItems: 'center',
+  marginBottom: 48,
+  marginTop: 32,
+});
+
+const Title = styled(Text)({
+  fontSize: 32,
+  fontWeight: 'bold',
+  color: 'text',
+  textAlign: 'center',
+  marginBottom: 8,
+});
+
+const Subtitle = styled(Text)({
+  fontSize: 18,
+  color: 'textSecondary',
+  textAlign: 'center',
+  lineHeight: 24,
+});
+
+const Card = styled(View)({
+  backgroundColor: 'surface',
+  borderRadius: 16,
+  padding: 24,
+  marginBottom: 24,
+  shadow: 'medium',
+});
+
+const CardTitle = styled(Text)({
+  fontSize: 20,
+  fontWeight: 'bold',
+  color: 'text',
+  marginBottom: 12,
+});
+
+const CardText = styled(Text)({
+  fontSize: 16,
+  color: 'textSecondary',
+  lineHeight: 22,
+});
+
+const Button = styled(Pressable)({
+  backgroundColor: 'primary',
+  paddingVertical: 16,
+  paddingHorizontal: 32,
+  borderRadius: 12,
+  alignItems: 'center',
+  shadow: 'small',
+});
+
+const ButtonText = styled(Text)({
+  color: 'onPrimary',
+  fontSize: 16,
+  fontWeight: 'bold',
+});
+
+const FeatureGrid = styled(View)({
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'space-between',
+  marginTop: 24,
+});
+
+const FeatureCard = styled(View)({
+  width: '48%',
+  backgroundColor: 'surface',
+  padding: 16,
+  borderRadius: 12,
+  alignItems: 'center',
+  marginBottom: 16,
+  shadow: 'small',
+});
+
+const FeatureIcon = styled(View)({
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  backgroundColor: 'primary',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 12,
+});
+
+const FeatureText = styled(Text)({
+  fontSize: 14,
+  color: 'text',
+  textAlign: 'center',
+  fontWeight: 'medium',
+});
+
+export default function HomeScreen() {
+  const router = useRouter();
+
+  const features = [
+    { icon: '⚡', title: 'Fast' },
+    { icon: '🔒', title: 'Secure' },
+    { icon: '🎨', title: 'Modern' },
+    { icon: '🚀', title: 'Powerful' },
+  ];
+
+  return (
+    <Container>
+      <Content>
+        <HeroSection>
+          <Title>Welcome to Apollo18</Title>
+          <Subtitle>
+            Experience the future of Web3 with our premium, modern mobile application
+          </Subtitle>
+        </HeroSection>
+
+        <Card>
+          <CardTitle>Get Started</CardTitle>
+          <CardText>
+            Discover amazing features and connect with the Web3 ecosystem. 
+            Your journey into the decentralized world starts here.
+          </CardText>
+          
+          <Button onPress={() => router.push('/profile')} style={{ marginTop: 20 }}>
+            <ButtonText>View Profile</ButtonText>
+          </Button>
+        </Card>
+
+        <Card>
+          <CardTitle>Features</CardTitle>
+          <FeatureGrid>
+            {features.map((feature, index) => (
+              <FeatureCard key={index}>
+                <FeatureIcon>
+                  <Text style={{ fontSize: 20 }}>{feature.icon}</Text>
+                </FeatureIcon>
+                <FeatureText>{feature.title}</FeatureText>
+              </FeatureCard>
+            ))}
+          </FeatureGrid>
+        </Card>
+
+        <Card>
+          <CardTitle>Web3 Ready</CardTitle>
+          <CardText>
+            Built with the latest Web3 technologies including WalletConnect, 
+            wagmi, and viem for seamless blockchain interactions.
+          </CardText>
+        </Card>
+      </Content>
+    </Container>
+  );
+}
