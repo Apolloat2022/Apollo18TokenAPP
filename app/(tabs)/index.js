@@ -232,6 +232,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.content}>
+     <Text style={{ fontSize: 32, color: 'lime' }}>LIVE SITE</Text>
         {/* Header with Logo */}
         <View style={styles.header}>
           <Image 
