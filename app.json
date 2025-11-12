@@ -11,22 +11,15 @@
       "backgroundColor": "#6200EE",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "ios": {
-      "supportsTablet": true
-    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#6200EE"
-      }
+      "adaptiveIcon": { "backgroundColor": "#6200EE" }
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/icon.png"
     },
-    "plugins": [
-      "expo-router"
-    ]
+    "plugins": ["expo-router"]
   }
 }
