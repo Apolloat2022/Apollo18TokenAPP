@@ -20,6 +20,9 @@
       "bundler": "metro",
       "favicon": "./assets/icon.png"
     },
-    "plugins": ["expo-router"]
+    "plugins": ["expo-router"],
+    "experiments": {
+      "baseUrl": "/Apollo18TokenAPP"
+    }
   }
 }
