@@ -1,81 +1,132 @@
-/* services/googleSheets.js  */
-// TEMPORARY HARDCODE FOR TESTING
+/* services/googleSheets.js - WORKING FOR BOTH MOBILE & DESKTOP */
 const GSCRIPT_URL = process.env.EXPO_PUBLIC_GSCRIPT_URL;
+
+console.log('🔌 Google Service URL:', GSCRIPT_URL ? '✅ Loaded' : '❌ Missing');
 
 export const googleSheetsService = {
   
   recordUserEmail: async (email, walletAddress = '') => {
     if (!GSCRIPT_URL) {
-      console.warn('⚠️ EXPO_PUBLIC_GSCRIPT_URL missing');
+      console.warn('⚠️ GSCRIPT_URL missing - check .env.local');
       return { success: false, error: 'Service unavailable' };
     }
 
-    // ALWAYS use JSONP (Works on iPhone, Android, Desktop Edge/Chrome/Safari)
-    // This bypasses "Tracking Prevention" and CORS issues.
-    console.log('📨 Sending JSONP request for:', email);
+    console.log('📨 Recording email:', email, 'Wallet:', walletAddress || 'none');
 
-    return new Promise((resolve) => {
-      // Create a unique callback name
-      const callbackName = 'cb_' + Math.round(Math.random() * 1000000);
+    // DUAL APPROACH: Try fetch first (mobile), JSONP fallback (desktop)
+    try {
+      // First try: Direct fetch (works on mobile)
+      const response = await fetch(GSCRIPT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'recordEmail',
+          source: 'apollo18-app',
+          email: email,
+          wallet: walletAddress
+          // NO timestamp - let Google Script handle it!
+        })
+      });
       
-      const url = new URL(GSCRIPT_URL);
-      url.searchParams.set('action', 'recordEmail');
-      url.searchParams.set('email', email);
-      url.searchParams.set('wallet', walletAddress);
-      url.searchParams.set('timestamp', new Date().toISOString());
-      url.searchParams.set('source', 'apollo18-app');
-      url.searchParams.set('callback', callbackName);
+      const result = await response.json();
+      console.log('✅ Fetch success (mobile):', result);
+      return result;
+      
+    } catch (fetchError) {
+      console.log('📨 Fetch failed, trying JSONP (desktop)...');
+      
+      // Fallback: JSONP (works on desktop browsers)
+      return new Promise((resolve) => {
+        const callbackName = 'cb_' + Math.round(Math.random() * 1000000);
+        
+        const url = new URL(GSCRIPT_URL);
+        url.searchParams.set('action', 'recordEmail');
+        url.searchParams.set('source', 'apollo18-app');
+        url.searchParams.set('email', email);
+        if (walletAddress) url.searchParams.set('wallet', walletAddress);
+        // NO timestamp parameter!
+        url.searchParams.set('callback', callbackName);
 
-      const script = document.createElement('script');
-      script.src = url.toString();
-      script.async = true;
+        const script = document.createElement('script');
+        script.src = url.toString();
+        script.async = true;
 
-      // 1. Success Handler
-      window[callbackName] = (data) => {
-        cleanup();
-        console.log('✅ JSONP Success:', data);
-        resolve(data);
-      };
+        window[callbackName] = (data) => {
+          cleanup();
+          console.log('✅ JSONP success (desktop):', data);
+          resolve(data);
+        };
 
-      // 2. Error Handler (Network fail or strict blocking)
-      script.onerror = (err) => {
-        cleanup();
-        console.warn('⚠️ JSONP Error (likely network or strict blocker):', err);
-        // We resolve success:true anyway so the UI doesn't freeze.
-        // The script usually actually executes even if the browser throws a warn.
-        resolve({ success: true, message: 'best-effort', email });
-      };
+        script.onerror = (err) => {
+          cleanup();
+          console.warn('⚠️ JSONP failed:', err);
+          resolve({ success: false, error: 'Network error' });
+        };
 
-      // 3. Cleanup helper
-      function cleanup() {
-        delete window[callbackName];
-        if (document.body.contains(script)) {
-          document.body.removeChild(script);
+        function cleanup() {
+          delete window[callbackName];
+          if (document.body.contains(script)) {
+            document.body.removeChild(script);
+          }
         }
-      }
 
-      // 4. Fire
-      document.body.appendChild(script);
-    });
+        document.body.appendChild(script);
+      });
+    }
   },
 
-  // Keep Transaction logging simple (fire & forget)
   recordTransaction: async (email, ethAmount, txHash = '') => {
-    if (!GSCRIPT_URL) return { success: true };
+    if (!GSCRIPT_URL) return { success: false, error: 'URL not set' };
+
+    console.log('💰 Recording transaction:', { email, ethAmount });
+
     try {
-      const url = new URL(GSCRIPT_URL);
-      url.searchParams.set('action', 'recordTransaction');
-      url.searchParams.set('email', email);
-      url.searchParams.set('ethAmount', ethAmount.toString());
-      url.searchParams.set('txHash', txHash);
-      url.searchParams.set('timestamp', new Date().toISOString());
-      
-      // Use Image for transactions (less critical if blocked)
-      const img = new Image();
-      img.src = url.toString();
-      return { success: true };
-    } catch (err) {
-      return { success: true };
+      const response = await fetch(GSCRIPT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'recordTransaction', 
+          source: 'apollo18-app',
+          email: email,
+          ethAmount: ethAmount,
+          txHash: txHash
+        })
+      });
+      return await response.json();
+    } catch (error) {
+      // JSONP fallback for transactions
+      return new Promise((resolve) => {
+        const callbackName = 'cb_' + Math.round(Math.random() * 1000000);
+        const url = new URL(GSCRIPT_URL);
+        url.searchParams.set('action', 'recordTransaction');
+        url.searchParams.set('source', 'apollo18-app');
+        url.searchParams.set('email', email);
+        url.searchParams.set('ethAmount', ethAmount.toString());
+        if (txHash) url.searchParams.set('txHash', txHash);
+        url.searchParams.set('callback', callbackName);
+
+        const script = document.createElement('script');
+        script.src = url.toString();
+        script.async = true;
+
+        window[callbackName] = (data) => {
+          delete window[callbackName];
+          if (document.body.contains(script)) document.body.removeChild(script);
+          resolve(data);
+        };
+
+        script.onerror = () => {
+          delete window[callbackName];
+          if (document.body.contains(script)) document.body.removeChild(script);
+          resolve({ success: false, error: 'Network error' });
+        };
+
+        document.body.appendChild(script);
+      });
     }
   },
 
@@ -90,6 +141,6 @@ export const googleSheetsService = {
   },
 
   checkHealth: async () => {
-    return { success: true, message: 'Service Ready' };
+    return { success: true, message: 'Service ready' };
   }
 };
