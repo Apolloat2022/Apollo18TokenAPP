@@ -1,0 +1,26 @@
+// metro.config.js
+import { getDefaultConfig } from 'expo/metro-config';
+
+const config = getDefaultConfig(__dirname);
+
+// Add support for node modules and Web3 dependencies
+config.resolver.extraNodeModules = {
+  ...config.resolver.extraNodeModules,
+  stream: require.resolve('stream-browserify'),
+  crypto: require.resolve('crypto-browserify'),
+  http: require.resolve('stream-http'),
+  https: require.resolve('https-browserify'),
+  os: require.resolve('os-browserify/browser'),
+  path: require.resolve('path-browserify'),
+  vm: require.resolve('vm-browserify'),
+  process: require.resolve('process/browser'),
+};
+
+// Add support for .cjs files (CommonJS)
+config.resolver.sourceExts = [
+  ...config.resolver.sourceExts,
+  'cjs',
+  'mjs',
+];
+
+export default config;
