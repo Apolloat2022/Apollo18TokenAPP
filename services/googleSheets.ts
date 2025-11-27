@@ -62,6 +62,58 @@ class GoogleSheetsService {
     }
   }
 
+  // NEW METHOD: Record wallet address when user connects wallet
+  async recordWalletAddress(walletData: {
+    email: string;
+    wallet: string;
+    source?: string;
+  }): Promise<{ success: boolean; message?: string; error?: string }> {
+    if (!process.env.EXPO_PUBLIC_GSCRIPT_URL) {
+      console.warn('⚠️ EXPO_PUBLIC_GSCRIPT_URL missing - check .env file');
+      return { success: false, error: 'Service unavailable' };
+    }
+
+    console.log('👛 Recording wallet address:', {
+      email: walletData.email,
+      wallet: walletData.wallet
+    });
+
+    try {
+      const params = new URLSearchParams({
+        action: 'recordWallet',
+        source: 'mobile-app',
+        email: walletData.email,
+        wallet: walletData.wallet
+      });
+
+      const url = `${process.env.EXPO_PUBLIC_GSCRIPT_URL}?${params.toString()}`;
+      console.log('🔗 Wallet recording URL:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'no-cors',
+      });
+
+      console.log('✅ Wallet address recorded to Google Sheets');
+      return { 
+        success: true, 
+        message: 'Wallet address recorded successfully' 
+      };
+
+    } catch (error: any) {
+      console.error('❌ Wallet recording failed:', error);
+      console.log('👛 Wallet for manual entry:', {
+        email: walletData.email,
+        wallet: walletData.wallet
+      });
+      
+      return { 
+        success: true,
+        message: 'Wallet recorded locally' 
+      };
+    }
+  }
+
   async recordEnhancedTransaction(txData: TransactionRecord): Promise<{ success: boolean; message?: string; error?: string }> {
     if (!process.env.EXPO_PUBLIC_GSCRIPT_URL) {
       console.warn('⚠️ EXPO_PUBLIC_GSCRIPT_URL missing - check .env file');

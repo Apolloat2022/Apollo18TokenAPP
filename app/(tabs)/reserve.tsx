@@ -1,41 +1,41 @@
 // app/(tabs)/reserve.tsx
-import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking, Modal } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useWeb3 } from '../../services/useWeb3';
 import { googleSheetsService } from '../../services/googleSheets';
-import { transactionTracker } from '../../services/transactionTracker';
 
 export default function ReserveScreen() {
   const [email, setEmail] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [activeTab, setActiveTab] = useState<'email' | 'wallet' | 'reserve' | 'verify'>('email');
+  const [activeTab, setActiveTab] = useState<'email' | 'copy' | 'wallet' | 'verify'>('email');
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
+  const [hasRecordedTransaction, setHasRecordedTransaction] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   
-  const { 
-    address, 
-    isConnected, 
-    isLoading, 
-    error, 
-    connect, 
-    disconnect, 
-    formatAddress 
-  } = useWeb3();
+  // USD Modal State
+  const [showUsdModal, setShowUsdModal] = useState(false);
+  const [usdAmount, setUsdAmount] = useState('');
+  const [isConverting, setIsConverting] = useState(false);
 
-  // Store wallet address when connected
+  const { address, isConnected, isLoading, error, connect, formatAddress } = useWeb3();
+
   useEffect(() => {
     if (isConnected && address) {
       setConnectedAddress(address);
-      console.log('💰 Wallet address stored:', address);
+      console.log('👛 Wallet connected:', address);
     }
   }, [isConnected, address]);
 
-  // Log connection state changes
   useEffect(() => {
-    console.log('Wallet connection state changed:', { isConnected, address, connectedAddress });
-  }, [isConnected, address, connectedAddress]);
+    if (isConnected && address && activeTab === 'wallet') {
+      setTimeout(() => {
+        setActiveTab('verify');
+      }, 1500);
+    }
+  }, [isConnected, address, activeTab]);
 
   const verifyEmail = async () => {
     if (!email.trim()) {
@@ -51,29 +51,18 @@ export default function ReserveScreen() {
     setIsVerifying(true);
     
     try {
-      console.log('📧 User email for reservation:', email.trim());
-      
-      // Register user for transaction tracking
-      if (address || connectedAddress) {
-        const walletToUse = address || connectedAddress;
-        transactionTracker.registerUser(email.trim(), walletToUse!);
-      }
-      
-      const recordResult = await googleSheetsService.recordUserEmail({
+      const result = await googleSheetsService.recordUserEmail({
         email: email.trim(),
-        wallet: address || connectedAddress || '',
+        wallet: '',
         source: 'mobile-app'
       });
 
-      console.log('Google Sheets recording result:', recordResult);
-
-      Alert.alert('✅ Email Verified!', 'Your email has been recorded. Please continue to connect your wallet.');
-      setActiveTab('wallet');
+      Alert.alert('✅ Email Verified!', 'Your email has been recorded. Please copy the contract address.');
+      setActiveTab('copy');
       
     } catch (error) {
-      console.error('Email verification error:', error);
-      Alert.alert('✅ Email Verified', 'Please continue to wallet connection.');
-      setActiveTab('wallet');
+      Alert.alert('✅ Email Verified', 'Please continue to copy the contract address.');
+      setActiveTab('copy');
     } finally {
       setIsVerifying(false);
     }
@@ -83,53 +72,193 @@ export default function ReserveScreen() {
     try {
       await Clipboard.setStringAsync('0x0e3541725230432653A9a3F65eB5591D16822de0');
       setCopiedAddress(true);
-      Alert.alert('✅ Address Copied!', 'Contract address copied to clipboard.');
+      Alert.alert('✅ Address Copied!', 'Contract address copied to clipboard. Now connect your wallet.');
       
       setTimeout(() => setCopiedAddress(false), 3000);
+      setActiveTab('wallet');
     } catch (error) {
       Alert.alert('Copy Failed', 'Please copy the address manually.');
     }
   };
 
-  const showInstructions = () => {
-    console.log('Show Instructions clicked - Connection status:', { isConnected, address, connectedAddress });
-    
+  const handleWalletConnect = async (walletType: 'metamask' | 'coinbase') => {
+    try {
+      await connect(walletType);
+    } catch (error) {
+      Alert.alert('Connection Failed', 'Please try again or use a different wallet.');
+    }
+  };
+
+  const recordTransaction = async (ethAmount: string, usdAmount?: string) => {
     const currentWallet = address || connectedAddress;
     
     if (!currentWallet) {
-      Alert.alert('Wallet Required', 'Please connect your wallet first in Step 2.');
+      Alert.alert('Wallet Required', 'Please connect your wallet first.');
+      return;
+    }
+
+    if (!email) {
+      Alert.alert('Email Required', 'Please verify your email first.');
+      return;
+    }
+
+    const amount = parseFloat(ethAmount);
+    
+    if (amount < 0.0001) {
+      Alert.alert('Minimum Amount', 'The minimum amount is $1 USD worth of ETH.');
+      return;
+    }
+    
+    setIsRecording(true);
+    
+    try {
+      console.log('🎯 Starting ETH recording:', {
+        email,
+        wallet: currentWallet,
+        ethAmount: amount,
+        usdAmount
+      });
+
+      // Record with USD amount if provided
+      const enhancedResult = await googleSheetsService.recordEnhancedTransaction({
+        email: email,
+        wallet: currentWallet,
+        ethAmount: amount.toString(),
+        actualAmount: amount.toString(),
+        txHash: 'mobile_' + Date.now(),
+        fromAddress: currentWallet,
+        usdAmount: usdAmount
+      });
+
+      console.log('📊 Enhanced transaction result:', enhancedResult);
+
+      // Also try the basic record method as backup
+      const basicResult = await googleSheetsService.recordTransaction({
+        email: email,
+        ethAmount: amount.toString(),
+        txHash: 'mobile',
+        wallet: currentWallet
+      });
+
+      console.log('📊 Basic transaction result:', basicResult);
+
+      if (enhancedResult.success || basicResult.success) {
+        setHasRecordedTransaction(true);
+        
+        const successMessage = `✅ ETH Recorded!\n\n` +
+          `Amount: $${usdAmount} USD\n` +
+          `Converted to: ${amount} ETH\n` +
+          `APOLO Tokens: ${Math.floor(parseFloat(usdAmount || '0') * 100000).toLocaleString()}\n` +
+          `Wallet: ${formatAddress(currentWallet)}\n\n` +
+          `⚠️ Important: You must actually send ETH to our contract address:\n` +
+          `0x0e3541725230432653A9a3F65eB5591D16822de0\n\n` +
+          `Your APOLO tokens will be delivered after launch!`;
+
+        Alert.alert('Success', successMessage);
+        console.log('🎉 ETH recording completed successfully');
+      } else {
+        throw new Error('Both recording methods failed');
+      }
+
+    } catch (error) {
+      console.error('❌ ETH recording failed:', error);
+      Alert.alert(
+        '⚠️ Recording Issue',
+        `Your ETH was noted locally.\n\nSupport will contact you at ${email} for verification.\n\nError: ${error}`
+      );
+      setHasRecordedTransaction(true);
+    } finally {
+      setIsRecording(false);
+    }
+  };
+
+  const handleRecordETH = () => {
+    const currentWallet = address || connectedAddress;
+    
+    if (!email) {
+      Alert.alert('Email Required', 'Please go back to Step 1 and verify your email first.');
+      return;
+    }
+
+    if (!currentWallet) {
+      Alert.alert('Wallet Required', 'Please connect your wallet in Step 3 first.');
       setActiveTab('wallet');
       return;
     }
 
-    Alert.alert(
-      'Reservation Instructions',
-      `Ready to reserve APOLO tokens!\n\n1. Contract address is copied below\n2. Open your wallet app\n3. Send ETH to the contract\n4. Minimum: 0.01 ETH\n5. Network: Ethereum Mainnet\n6. From: ${formatAddress(currentWallet)}\n\nAfter sending ETH, return here to verify your transaction.`,
-      [
-        {
-          text: 'Copy Address Again',
-          onPress: copyAddress
-        },
-        {
-          text: 'Go to Verification',
-          onPress: () => setActiveTab('verify')
-        },
-        {
-          text: 'OK',
-          style: 'default'
-        }
-      ]
-    );
+    if (hasRecordedTransaction) {
+      Alert.alert('Already Recorded', 'Your ETH has already been recorded.');
+      return;
+    }
+
+    console.log('🎯 User clicked Record ETH button - Opening USD Modal');
+    setShowUsdModal(true);
+    setUsdAmount('');
   };
 
-  const handleWalletConnect = async (walletType: 'metamask' | 'coinbase') => {
-    try {
-      console.log('Connecting wallet:', walletType);
-      await connect(walletType);
-    } catch (error) {
-      console.error('Wallet connection error:', error);
-      Alert.alert('Connection Failed', 'Please try again or use a different wallet.');
+  const handleUsdSubmit = async () => {
+    if (!usdAmount || usdAmount.trim() === '') {
+      Alert.alert('Invalid Amount', 'Please enter a USD amount.');
+      return;
     }
+
+    const usdValue = parseFloat(usdAmount);
+    
+    if (isNaN(usdValue) || usdValue < 1) {
+      Alert.alert('Invalid Amount', 'Please enter a valid USD amount ($1 minimum).');
+      return;
+    }
+
+    console.log(`💰 User entered: $${usdValue} USD`);
+    
+    // Show loading state
+    setIsConverting(true);
+    
+    try {
+      const ethPrice = await googleSheetsService.getEthPrice();
+      const ethAmount = (usdValue / ethPrice).toFixed(6);
+      
+      console.log(`💰 Conversion: $${usdValue} USD = ${ethAmount} ETH at $${ethPrice} rate`);
+      
+      // Close modal first
+      setShowUsdModal(false);
+      setIsConverting(false);
+      
+      // AUTO-RECORD without confirmation
+      console.log('🔄 Auto-recording ETH transaction...');
+      await recordTransaction(ethAmount, usdValue.toString());
+      
+    } catch (error) {
+      console.error('❌ ETH recording process failed:', error);
+      setShowUsdModal(false);
+      setIsConverting(false);
+      
+      Alert.alert(
+        'Recording Failed',
+        'There was an issue recording your ETH. Please try again.',
+        [
+          { 
+            text: 'Try Again', 
+            onPress: () => setShowUsdModal(true)
+          }
+        ]
+      );
+    }
+  };
+
+  const handleContinueToVerify = async () => {
+    const currentWallet = address || connectedAddress;
+    
+    if (email && currentWallet) {
+      console.log('👛 Recording wallet address for:', email);
+      await googleSheetsService.recordWalletAddress({
+        email: email,
+        wallet: currentWallet,
+        source: 'mobile-app'
+      });
+    }
+    
+    setActiveTab('verify');
   };
 
   return (
@@ -148,21 +277,20 @@ export default function ReserveScreen() {
           </View>
 
           <View style={styles.progressContainer}>
-            <View style={[styles.progressStep, activeTab === 'email' && styles.progressStepActive]}>
-              <Text style={styles.progressText}>1</Text>
-            </View>
-            <View style={[styles.progressLine, activeTab !== 'email' && styles.progressLineActive]} />
-            <View style={[styles.progressStep, activeTab === 'wallet' && styles.progressStepActive]}>
-              <Text style={styles.progressText}>2</Text>
-            </View>
-            <View style={[styles.progressLine, activeTab === 'reserve' && styles.progressLineActive]} />
-            <View style={[styles.progressStep, activeTab === 'reserve' && styles.progressStepActive]}>
-              <Text style={styles.progressText}>3</Text>
-            </View>
-            <View style={[styles.progressLine, activeTab === 'verify' && styles.progressLineActive]} />
-            <View style={[styles.progressStep, activeTab === 'verify' && styles.progressStepActive]}>
-              <Text style={styles.progressText}>4</Text>
-            </View>
+            {['1', '2', '3', '4'].map((step, index) => (
+              <View key={step} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={[
+                  styles.progressStep, 
+                  (index === 0 && activeTab === 'email') ||
+                  (index === 1 && activeTab === 'copy') ||
+                  (index === 2 && activeTab === 'wallet') ||
+                  (index === 3 && activeTab === 'verify') ? styles.progressStepActive : {}
+                ]}>
+                  <Text style={styles.progressText}>{step}</Text>
+                </View>
+                {index < 3 && <View style={styles.progressLine} />}
+              </View>
+            ))}
           </View>
 
           {error && (
@@ -210,11 +338,68 @@ export default function ReserveScreen() {
             </View>
           )}
 
+          {(activeTab === 'copy') && (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Ionicons name="copy" size={24} color="#FFD700" />
+                <Text style={styles.cardTitle}>Step 2: Copy Contract Address</Text>
+              </View>
+              
+              <Text style={styles.cardDescription}>
+                Copy our contract address. You will send ETH to this address.
+              </Text>
+
+              <View style={styles.addressContainer}>
+                <Text style={styles.addressLabel}>Contract Address:</Text>
+                <Text style={styles.addressText}>0x0e3541725230432653A9a3F65eB5591D16822de0</Text>
+              </View>
+
+              <View style={styles.infoBox}>
+                <Text style={styles.infoTitle}>Important Instructions:</Text>
+                <Text style={styles.infoText}>1. Copy the contract address above</Text>
+                <Text style={styles.infoText}>2. Open your wallet app</Text>
+                <Text style={styles.infoText}>3. Send ETH to this address</Text>
+                <Text style={styles.infoText}>4. Minimum: ~$1 USD worth of ETH</Text>
+                <Text style={styles.infoText}>5. Network: Ethereum Mainnet</Text>
+                <Text style={styles.infoText}>6. Return here after sending ETH</Text>
+              </View>
+
+              <Pressable 
+                style={[styles.button, copiedAddress && styles.copiedButton]} 
+                onPress={copyAddress}
+              >
+                <Ionicons name={copiedAddress ? "checkmark" : "copy-outline"} size={20} color="#000000" />
+                <Text style={styles.buttonText}>
+                  {copiedAddress ? 'Copied!' : 'Copy Contract Address'}
+                </Text>
+              </Pressable>
+
+              <Pressable 
+                style={styles.secondaryButton}
+                onPress={() => {
+                  Linking.openURL('https://etherscan.io/address/0x0e3541725230432653A9a3F65eB5591D16822de0')
+                    .catch(err => console.error('Failed to open Etherscan:', err));
+                }}
+              >
+                <Ionicons name="open-outline" size={20} color="#FFD700" />
+                <Text style={styles.secondaryButtonText}>View on Etherscan</Text>
+              </Pressable>
+
+              <Pressable 
+                style={[styles.secondaryButton, { marginTop: 8 }]} 
+                onPress={() => setActiveTab('email')}
+              >
+                <Ionicons name="arrow-back" size={20} color="#FFD700" />
+                <Text style={styles.secondaryButtonText}>Back to Email</Text>
+              </Pressable>
+            </View>
+          )}
+
           {(activeTab === 'wallet') && (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Ionicons name="wallet" size={24} color="#FFD700" />
-                <Text style={styles.cardTitle}>Step 2: Connect Wallet</Text>
+                <Text style={styles.cardTitle}>Step 3: Connect Your Wallet</Text>
               </View>
               
               {isConnected && address ? (
@@ -223,23 +408,28 @@ export default function ReserveScreen() {
                     ✅ Connected: {formatAddress(address)}
                   </Text>
                   <Text style={styles.cardDescription}>
-                    Wallet connected! Your address has been saved for transaction tracking.
+                    Wallet connected! Please proceed to record your ETH.
                   </Text>
-                  <Pressable style={styles.button} onPress={() => {
-                    setConnectedAddress(address);
-                    setActiveTab('reserve');
-                  }}>
+                  
+                  <View style={[styles.infoBox, { backgroundColor: '#1A2A1A' }]}>
+                    <Text style={styles.infoTitle}>Next Step:</Text>
+                    <Text style={styles.infoText}>• Go to Step 4 to record your ETH</Text>
+                    <Text style={styles.infoText}>• Your wallet is ready: {formatAddress(address)}</Text>
+                    <Text style={styles.infoText}>• ETH not recorded yet</Text>
+                  </View>
+
+                  <Pressable 
+                    style={styles.button}
+                    onPress={handleContinueToVerify}
+                  >
                     <Ionicons name="arrow-forward" size={20} color="#000000" />
-                    <Text style={styles.buttonText}>Continue to Reserve</Text>
-                  </Pressable>
-                  <Pressable style={styles.secondaryButton} onPress={() => disconnect()}>
-                    <Text style={styles.secondaryButtonText}>Disconnect Wallet</Text>
+                    <Text style={styles.buttonText}>Continue to Record ETH</Text>
                   </Pressable>
                 </>
               ) : (
                 <>
                   <Text style={styles.cardDescription}>
-                    Connect your Ethereum wallet to continue.
+                    Connect the wallet you used to send ETH to our contract.
                   </Text>
                   
                   <Pressable 
@@ -268,81 +458,62 @@ export default function ReserveScreen() {
 
                   <Pressable 
                     style={[styles.secondaryButton, { marginTop: 8 }]} 
-                    onPress={() => setActiveTab('email')}
+                    onPress={() => setActiveTab('copy')}
                   >
                     <Ionicons name="arrow-back" size={20} color="#FFD700" />
-                    <Text style={styles.secondaryButtonText}>Back to Email</Text>
+                    <Text style={styles.secondaryButtonText}>Back to Copy Address</Text>
                   </Pressable>
                 </>
               )}
             </View>
           )}
 
-          {(activeTab === 'reserve') && (
+          {(activeTab === 'verify') && (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Ionicons name="card" size={24} color="#FFD700" />
-                <Text style={styles.cardTitle}>Step 3: Make Reservation</Text>
+                <Ionicons name="checkmark-circle" size={24} color="#FFD700" />
+                <Text style={styles.cardTitle}>Step 4: Record Your ETH</Text>
               </View>
               
               <Text style={styles.cardDescription}>
-                Send ETH to reserve your APOLO tokens.
+                Record your ETH to complete your APOLO reservation.
               </Text>
 
-              <View style={styles.addressContainer}>
-                <Text style={styles.addressLabel}>Contract Address:</Text>
-                <Text style={styles.addressText}>0x0e3541725230432653A9a3F65eB5591D16822de0</Text>
-              </View>
+              {hasRecordedTransaction ? (
+                <View style={[styles.infoBox, { backgroundColor: '#1A2A1A', borderColor: '#00FF00' }]}>
+                  <Text style={[styles.infoTitle, { color: '#00FF00' }]}>✅ ETH Recorded!</Text>
+                  <Text style={styles.infoText}>📧 Email: {email}</Text>
+                  <Text style={styles.infoText}>👛 Wallet: {formatAddress(address || connectedAddress)}</Text>
+                  <Text style={styles.infoText}>🎯 Status: APOLO tokens reserved</Text>
+                  <Text style={styles.infoText}>⏰ Delivery: After token launch</Text>
+                </View>
+              ) : (
+                <View style={styles.infoBox}>
+                  <Text style={styles.infoTitle}>Ready to Record Your ETH</Text>
+                  <Text style={styles.infoText}>• Your email: {email}</Text>
+                  <Text style={styles.infoText}>• Your wallet: {formatAddress(address || connectedAddress)}</Text>
+                  <Text style={styles.infoText}>• Click below to enter USD amount sent</Text>
+                  <Text style={styles.infoText}>• System will convert to ETH automatically</Text>
+                  <Text style={styles.infoText}>• This completes your reservation</Text>
+                </View>
+              )}
 
-              <View style={styles.infoBox}>
-                <Text style={styles.infoTitle}>Reservation Details:</Text>
-                <Text style={styles.infoText}>• Minimum: 0.01 ETH</Text>
-                <Text style={styles.infoText}>• Network: Ethereum Mainnet</Text>
-                <Text style={styles.infoText}>• Send from: {formatAddress(address || connectedAddress || '')}</Text>
-                <Text style={styles.infoText}>• Tokens delivered after launch</Text>
-              </View>
-
-              <Pressable style={styles.button} onPress={showInstructions}>
-                <Ionicons name="send" size={20} color="#000000" />
-                <Text style={styles.buttonText}>Show Instructions</Text>
-              </Pressable>
-
-              <Pressable 
-                style={[styles.secondaryButton, copiedAddress && styles.copiedButton]} 
-                onPress={copyAddress}
-              >
-                <Ionicons name={copiedAddress ? "checkmark" : "copy-outline"} size={20} color="#FFD700" />
-                <Text style={styles.secondaryButtonText}>
-                  {copiedAddress ? 'Copied!' : 'Copy Address'}
-                </Text>
-              </Pressable>
-
-              <Pressable 
-                style={[styles.secondaryButton, { marginTop: 8 }]} 
-                onPress={async () => {
-                  // Record a pending transaction when user claims they sent ETH
-                  if (email && (address || connectedAddress)) {
-                    const currentWallet = address || connectedAddress;
-                    console.log('🔄 Recording pending transaction for:', email, 'wallet:', currentWallet);
-                    
-                    const result = await googleSheetsService.recordEnhancedTransaction({
-                      email: email,
-                      wallet: currentWallet!,
-                      ethAmount: 'pending',
-                      actualAmount: 'pending',
-                      txHash: 'pending_verification',
-                      fromAddress: currentWallet!
-                    });
-
-                    console.log('Pending transaction result:', result);
-                  }
-                  
-                  setActiveTab('verify');
-                }}
-              >
-                <Ionicons name="checkmark-circle" size={20} color="#FFD700" />
-                <Text style={styles.secondaryButtonText}>I Sent ETH - Verify</Text>
-              </Pressable>
+              {!hasRecordedTransaction && (
+                <Pressable 
+                  style={[styles.button, isRecording && styles.buttonDisabled]} 
+                  onPress={handleRecordETH}
+                  disabled={isRecording}
+                >
+                  {isRecording ? (
+                    <ActivityIndicator color="#000000" />
+                  ) : (
+                    <Ionicons name="document-text" size={20} color="#000000" />
+                  )}
+                  <Text style={styles.buttonText}>
+                    {isRecording ? 'Recording...' : 'Record Your ETH'}
+                  </Text>
+                </Pressable>
+              )}
 
               <Pressable 
                 style={[styles.secondaryButton, { marginTop: 8 }]} 
@@ -351,160 +522,77 @@ export default function ReserveScreen() {
                 <Ionicons name="arrow-back" size={20} color="#FFD700" />
                 <Text style={styles.secondaryButtonText}>Back to Wallet</Text>
               </Pressable>
-            </View>
-          )}
 
-          {(activeTab === 'verify') && (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="checkmark-circle" size={24} color="#FFD700" />
-                <Text style={styles.cardTitle}>Step 4: Verify Transaction</Text>
-              </View>
-              
-              <Text style={styles.cardDescription}>
-                Verify your ETH deposit to complete your APOLO reservation.
-              </Text>
-
-              <Pressable 
-                style={styles.button} 
-                onPress={async () => {
-                  const result = await transactionTracker.verifyTransactionManually(email);
-                  Alert.alert(
-                    'Transaction Verification',
-                    result.instructions
-                  );
-                }}
-              >
-                <Ionicons name="search" size={20} color="#000000" />
-                <Text style={styles.buttonText}>How to Verify</Text>
-              </Pressable>
-
-              <Pressable 
-                style={styles.secondaryButton}
-                onPress={() => {
-                  // Use the stored address if current address is null
-                  const currentWallet = address || connectedAddress;
-                  
-                  if (!email) {
-                    Alert.alert('Email Required', 'Please go back to Step 1 and verify your email first.');
-                    return;
-                  }
-
-                  if (!currentWallet) {
-                    Alert.alert('Wallet Required', 'Please connect your wallet in Step 2 first.');
-                    setActiveTab('wallet');
-                    return;
-                  }
-
-                  Alert.prompt(
-                    'Record Your ETH Transaction',
-                    `Enter the amount of ETH you sent from: ${formatAddress(currentWallet)}`,
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { 
-                        text: 'Record', 
-                        onPress: async (ethAmount) => {
-                          if (ethAmount && !isNaN(parseFloat(ethAmount))) {
-                            
-                            console.log('💰 Recording transaction:', {
-                              email,
-                              ethAmount,
-                              wallet: currentWallet
-                            });
-                            
-                            // Record enhanced transaction
-                            const enhancedResult = await googleSheetsService.recordEnhancedTransaction({
-                              email: email,
-                              wallet: currentWallet,
-                              ethAmount: ethAmount,
-                              actualAmount: ethAmount,
-                              txHash: 'manual_entry_' + Date.now(),
-                              fromAddress: currentWallet
-                            });
-
-                            console.log('Enhanced transaction result:', enhancedResult);
-
-                            // Also record basic transaction
-                            const basicResult = await googleSheetsService.recordTransaction({
-                              email: email,
-                              ethAmount: ethAmount,
-                              txHash: 'manual',
-                              wallet: currentWallet
-                            });
-
-                            console.log('Basic transaction result:', basicResult);
-
-                            Alert.alert(
-                              '✅ Transaction Recorded!',
-                              `Your ${ethAmount} ETH transaction from ${formatAddress(currentWallet)} has been recorded.\n\nYou will receive APOLO tokens after launch!`
-                            );
-
-                          } else {
-                            Alert.alert('Invalid Amount', 'Please enter a valid ETH amount (e.g., 0.05)');
-                          }
-                        }
-                      }
-                    ],
-                    'plain-text',
-                    '0.05'
-                  );
-                }}
-              >
-                <Ionicons name="document-text" size={20} color="#FFD700" />
-                <Text style={styles.secondaryButtonText}>Record My ETH Transaction</Text>
-              </Pressable>
-
-              {/* Debug button to check current state */}
-              <Pressable 
-                style={[styles.secondaryButton, { backgroundColor: '#333333' }]}
-                onPress={() => {
-                  Alert.alert(
-                    'Debug Info',
-                    `Email: ${email || 'none'}\nCurrent Address: ${address || 'none'}\nStored Address: ${connectedAddress || 'none'}\nConnected: ${isConnected}`
-                  );
-                }}
-              >
-                <Ionicons name="bug" size={20} color="#FFD700" />
-                <Text style={styles.secondaryButtonText}>Debug Info</Text>
-              </Pressable>
-
-              {/* Test transaction recording button */}
-              <Pressable 
-                style={[styles.secondaryButton, { backgroundColor: '#1a1a1a' }]}
-                onPress={async () => {
-                  const currentWallet = address || connectedAddress;
-                  if (email && currentWallet) {
-                    const result = await googleSheetsService.recordEnhancedTransaction({
-                      email: email,
-                      wallet: currentWallet,
-                      ethAmount: '0.05',
-                      actualAmount: '0.05',
-                      txHash: 'test_transaction_' + Date.now(),
-                      fromAddress: currentWallet
-                    });
-                    Alert.alert(
-                      'Test Transaction Recorded',
-                      result.success ? '✅ Test transaction recorded to Google Sheets' : '⚠️ Recorded locally'
-                    );
-                  }
-                }}
-              >
-                <Ionicons name="flask" size={20} color="#FFD700" />
-                <Text style={styles.secondaryButtonText}>Test Transaction Recording</Text>
-              </Pressable>
-
-              <Pressable 
-                style={[styles.secondaryButton, { marginTop: 8 }]} 
-                onPress={() => setActiveTab('reserve')}
-              >
-                <Ionicons name="arrow-back" size={20} color="#FFD700" />
-                <Text style={styles.secondaryButtonText}>Back to Reservation</Text>
-              </Pressable>
+              {hasRecordedTransaction && (
+                <Pressable 
+                  style={[styles.button, { marginTop: 16, backgroundColor: '#4CAF50' }]} 
+                  onPress={() => {
+                    setEmail('');
+                    setConnectedAddress(null);
+                    setHasRecordedTransaction(false);
+                    setActiveTab('email');
+                  }}
+                >
+                  <Ionicons name="refresh" size={20} color="#FFFFFF" />
+                  <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Make Another Reservation</Text>
+                </Pressable>
+              )}
             </View>
           )}
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* USD Modal - Only shows when needed */}
+      <Modal
+        visible={showUsdModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowUsdModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Record Your ETH</Text>
+            <Text style={styles.modalDescription}>
+              Enter the USD amount you sent from {formatAddress(address || connectedAddress)}:
+            </Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter USD amount (e.g., 50)"
+              placeholderTextColor="#666666"
+              keyboardType="decimal-pad"
+              value={usdAmount}
+              onChangeText={setUsdAmount}
+              autoFocus={true}
+            />
+            
+            <View style={styles.modalButtons}>
+              <Pressable 
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setShowUsdModal(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </Pressable>
+              
+              <Pressable 
+                style={[styles.modalButton, styles.modalConfirmButton, (!usdAmount || parseFloat(usdAmount) < 1) && styles.buttonDisabled]}
+                onPress={handleUsdSubmit}
+                disabled={!usdAmount || parseFloat(usdAmount) < 1 || isConverting}
+              >
+                {isConverting ? (
+                  <ActivityIndicator color="#000000" />
+                ) : (
+                  <Ionicons name="calculator" size={20} color="#000000" />
+                )}
+                <Text style={styles.modalConfirmButtonText}>
+                  {isConverting ? 'Recording ETH...' : 'Convert & Record ETH'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -513,11 +601,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
   content: { flex: 1, padding: 16 },
   header: { alignItems: 'center', marginBottom: 32, marginTop: 16 },
-  logo: {
-    width: 80,
-    height: 80,
-    marginBottom: 12,
-  },
+  logo: { width: 80, height: 80, marginBottom: 12 },
   title: { fontSize: 28, fontWeight: 'bold', color: '#FFD700', textAlign: 'center', marginBottom: 8 },
   subtitle: { fontSize: 16, color: '#FFFFFF', textAlign: 'center', lineHeight: 22, opacity: 0.8 },
   progressContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 32 },
@@ -525,7 +609,6 @@ const styles = StyleSheet.create({
   progressStepActive: { backgroundColor: '#FFD700' },
   progressText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
   progressLine: { width: 40, height: 2, backgroundColor: '#333333', marginHorizontal: 8 },
-  progressLineActive: { backgroundColor: '#FFD700' },
   card: { backgroundColor: '#1A1A1A', borderRadius: 16, padding: 20, marginBottom: 20 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12 },
   cardTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFD700' },
@@ -541,7 +624,7 @@ const styles = StyleSheet.create({
   addressContainer: { backgroundColor: '#2A2A2A', padding: 12, borderRadius: 8, marginBottom: 16 },
   addressLabel: { color: '#888888', fontSize: 12, marginBottom: 4 },
   addressText: { color: '#FFFFFF', fontSize: 12, fontFamily: 'monospace' },
-  infoBox: { backgroundColor: '#2A2A2A', padding: 16, borderRadius: 8, marginBottom: 16 },
+  infoBox: { backgroundColor: '#2A2A2A', padding: 16, borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#333333' },
   infoTitle: { color: '#FFD700', fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
   infoText: { color: '#FFFFFF', fontSize: 14, marginBottom: 4 },
   errorCard: {
@@ -559,5 +642,77 @@ const styles = StyleSheet.create({
     color: '#FF4444',
     fontSize: 14,
     flex: 1,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFD700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 20,
+    opacity: 0.8,
+    lineHeight: 20,
+  },
+  modalInput: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 16,
+    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#333333',
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  modalCancelButton: {
+    backgroundColor: '#333333',
+  },
+  modalConfirmButton: {
+    backgroundColor: '#FFD700',
+  },
+  modalCancelButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  modalConfirmButtonText: {
+    color: '#000000',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

@@ -1,15 +1,16 @@
-export default {
+// app.config.js
+module.exports = {
   expo: {
-    name: "Apollo18",
-    slug: "apollo18",
+    name: "Apollo App",
+    slug: "apollo-app",
     version: "1.0.0",
     orientation: "portrait",
+    icon: "./assets/icon.png",
     userInterfaceStyle: "light",
-    scheme: "apollo18",
-    newArchEnabled: true,
     splash: {
-      backgroundColor: "#6200EE",
-      resizeMode: "contain"
+      image: "./assets/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff"
     },
     assetBundlePatterns: [
       "**/*"
@@ -19,18 +20,21 @@ export default {
     },
     android: {
       adaptiveIcon: {
-        backgroundColor: "#6200EE"
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#FFFFFF"
       }
     },
     web: {
-      bundler: "metro"
+      favicon: "./assets/favicon.png"
     },
     plugins: [
-      "expo-router"
+      "expo-router",
+      "expo-font"
     ],
+    scheme: "apollo",
     extra: {
-      eas: {
-        projectId: "your-eas-project-id"
+      router: {
+        origin: false
       }
     }
   }
