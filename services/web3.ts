@@ -1,213 +1,291 @@
 // services/web3.ts
-import { Alert, Platform } from 'react-native';
+import { ethers } from 'ethers';
+
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
 
 class Web3Service {
-  walletAddress: string | null = null;
-  isConnected = false;
+  private provider: ethers.providers.Web3Provider | null = null;
+  private signer: ethers.Signer | null = null;
+  public isConnected = false;
+  public address: string | null = null;
 
   // Check if Web3 is available
-  isWeb3Available() {
-    if (Platform.OS === 'web') {
-      return typeof window !== 'undefined' && !!(window as any).ethereum;
-    }
-    return false;
+  isWeb3Available(): boolean {
+    return typeof window !== 'undefined' && !!window.ethereum;
   }
 
-  // Connect to wallet - ADD THIS METHOD
-  async connectWallet(walletType: 'metamask' | 'coinbase' = 'metamask') {
-    if (walletType === 'metamask') {
-      return this.connectMetaMask();
-    } else {
-      return this.connectCoinbase();
+  // Initialize Web3 provider
+  private initializeProvider() {
+    if (!this.isWeb3Available()) {
+      throw new Error('Web3 not available. Please install MetaMask or another Web3 wallet.');
     }
+
+    this.provider = new ethers.providers.Web3Provider(window.ethereum);
+    this.signer = this.provider.getSigner();
+    return this.provider;
   }
 
-  // Connect to MetaMask
-  async connectMetaMask() {
+  // Check if already connected
+  async checkConnection(): Promise<boolean> {
     try {
       if (!this.isWeb3Available()) {
-        if (Platform.OS === 'ios' || Platform.OS === 'android') {
-          this.showMobileWalletInstructions('MetaMask');
-          return { success: false, error: 'Open in MetaMask browser' };
-        }
-        return { success: false, error: 'MetaMask not found. Please install MetaMask.' };
+        return false;
       }
 
-      const ethereum = (window as any).ethereum;
-      const accounts = await ethereum.request({ 
-        method: 'eth_requestAccounts' 
-      });
-      
-      if (accounts && accounts.length > 0) {
-        this.walletAddress = accounts[0];
-        this.isConnected = true;
-        
-        // Set up event listeners
-        this.setupEventListeners();
-        
-        return { success: true, address: this.walletAddress };
-      } else {
-        return { success: false, error: 'No accounts found' };
-      }
-    } catch (error: any) {
-      console.error('MetaMask connection error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Connect to Coinbase Wallet
-  async connectCoinbase() {
-    try {
-      if (this.isWeb3Available() && (window as any).ethereum.isCoinbaseWallet) {
-        return await this.connectMetaMask(); // Same flow for Coinbase
-      }
-      
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
-        this.showMobileWalletInstructions('Coinbase Wallet');
-        return { success: false, error: 'Open in Coinbase Wallet browser' };
-      }
-      
-      // Fallback: Open Coinbase Wallet app
-      if (Platform.OS === 'web') {
-        window.open('https://go.cb-w.com/walletconnect', '_blank');
-      }
-      
-      return { success: false, error: 'Coinbase Wallet not detected. Please connect manually.' };
-    } catch (error: any) {
-      console.error('Coinbase connection error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Check connection status - RENAME THIS METHOD
-  async checkConnection() {
-    if (!this.isWeb3Available()) return false;
-    
-    try {
-      const ethereum = (window as any).ethereum;
-      const accounts = await ethereum.request({ 
+      const accounts = await window.ethereum.request({ 
         method: 'eth_accounts' 
       });
-      
-      if (accounts && accounts.length > 0) {
-        this.walletAddress = accounts[0];
+
+      if (accounts.length > 0) {
+        this.address = accounts[0];
         this.isConnected = true;
+        this.initializeProvider();
+        console.log('✅ Web3: Already connected to', this.address);
         return true;
       }
+
       return false;
     } catch (error) {
+      console.error('❌ Web3: Connection check failed:', error);
       return false;
     }
   }
 
-  // Get current wallet address - ADD THIS METHOD
-  getCurrentAddress(): string | null {
-    return this.walletAddress;
-  }
+  // Connect to wallet
+  async connectWallet(walletType: 'metamask' | 'coinbase' = 'metamask'): Promise<{ success: boolean; address?: string; error?: string }> {
+    try {
+      if (!this.isWeb3Available()) {
+        const message = 'No Web3 wallet detected. Please install MetaMask or Coinbase Wallet.';
+        console.error('❌ Web3:', message);
+        return { success: false, error: message };
+      }
 
-  // Show instructions for mobile users
-  showMobileWalletInstructions(walletName: string) {
-    Alert.alert(
-      `${walletName} Required`,
-      `To connect your wallet:\n\n1. Open this app in ${walletName} browser\n2. Or copy the contract address and send manually\n3. Make sure you're on Ethereum Mainnet`,
-      [
-        { text: 'Copy Address', onPress: () => this.copyContractAddress() },
-        { text: 'OK', style: 'default' }
-      ]
-    );
-  }
+      console.log(`🔌 Web3: Connecting to ${walletType}...`);
 
-  // Copy contract address to clipboard
-  async copyContractAddress() {
-    const contractAddress = '0x0e3541725230432653A9a3F65eB5591D16822de0';
-    if (Platform.OS === 'web' && navigator.clipboard) {
-      await navigator.clipboard.writeText(contractAddress);
-      Alert.alert('✅ Copied!', 'Contract address copied to clipboard.');
+      // Request account access
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      });
+
+      if (accounts.length === 0) {
+        const message = 'No accounts found. Please unlock your wallet.';
+        console.error('❌ Web3:', message);
+        return { success: false, error: message };
+      }
+
+      this.address = accounts[0];
+      this.isConnected = true;
+      this.initializeProvider();
+
+      console.log('✅ Web3: Connected successfully to', this.address);
+
+      // Set up event listeners for account changes
+      this.setupEventListeners();
+
+      return { 
+        success: true, 
+        address: this.address 
+      };
+
+    } catch (error: any) {
+      console.error('❌ Web3: Connection failed:', error);
+      
+      let errorMessage = 'Connection failed';
+      
+      if (error.code === 4001) {
+        errorMessage = 'Connection rejected by user';
+      } else if (error.code === -32002) {
+        errorMessage = 'Connection request already pending. Please check your wallet.';
+      } else if (error.message.includes('MetaMask')) {
+        errorMessage = 'MetaMask connection failed. Please try again.';
+      }
+
+      return { success: false, error: errorMessage };
     }
   }
 
-  // Setup event listeners for account changes
-  setupEventListeners() {
+  // Set up event listeners for account and chain changes
+  private setupEventListeners() {
     if (!this.isWeb3Available()) return;
 
-    const ethereum = (window as any).ethereum;
-    ethereum.on('accountsChanged', (accounts: string[]) => {
+    // Handle account changes
+    window.ethereum.on('accountsChanged', (accounts: string[]) => {
+      console.log('🔄 Web3: Accounts changed:', accounts);
       if (accounts.length === 0) {
-        // User disconnected wallet
+        // User disconnected all accounts
         this.disconnect();
       } else {
         // User switched accounts
-        this.walletAddress = accounts[0];
+        this.address = accounts[0];
+        this.initializeProvider();
+        // You might want to trigger a UI update here
+        window.dispatchEvent(new Event('web3AccountChanged'));
       }
     });
 
-    ethereum.on('chainChanged', (chainId: string) => {
-      // Handle network changes
-      console.log('Chain changed:', chainId);
+    // Handle chain changes
+    window.ethereum.on('chainChanged', (chainId: string) => {
+      console.log('🔄 Web3: Chain changed to:', chainId);
+      // Re-initialize provider when chain changes
+      this.initializeProvider();
+      window.dispatchEvent(new Event('web3ChainChanged'));
+    });
+
+    // Handle disconnect
+    window.ethereum.on('disconnect', (error: any) => {
+      console.log('❌ Web3: Disconnected:', error);
+      this.disconnect();
     });
   }
 
   // Disconnect wallet
-  disconnect() {
-    this.walletAddress = null;
+  disconnect(): void {
+    this.provider = null;
+    this.signer = null;
     this.isConnected = false;
-  }
-
-  // Format address for display - ADD THIS METHOD
-  formatAddress(address: string | null): string {
-    if (!address) return 'Not Connected';
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  }
-
-  // Validate Ethereum address - ADD THIS METHOD
-  isValidEthereumAddress(address: string): boolean {
-    return /^0x[a-fA-F0-9]{40}$/.test(address);
-  }
-
-  // Get network information
-  async getNetwork() {
-    if (!this.isWeb3Available()) return null;
+    this.address = null;
     
+    console.log('✅ Web3: Disconnected');
+    
+    // Dispatch event for UI updates
+    window.dispatchEvent(new Event('web3Disconnected'));
+  }
+
+  // Get current address
+  getCurrentAddress(): string | null {
+    return this.address;
+  }
+
+  // Get provider instance
+  getProvider(): ethers.providers.Web3Provider | null {
+    return this.provider;
+  }
+
+  // Get signer instance
+  getSigner(): ethers.Signer | null {
+    return this.signer;
+  }
+
+  // Get chain ID
+  async getChainId(): Promise<number> {
+    if (!this.provider) {
+      throw new Error('Provider not initialized');
+    }
+    const network = await this.provider.getNetwork();
+    return network.chainId;
+  }
+
+  // Get ETH balance
+  async getBalance(address?: string): Promise<string> {
+    if (!this.provider) {
+      throw new Error('Provider not initialized');
+    }
+
+    const targetAddress = address || this.address;
+    if (!targetAddress) {
+      throw new Error('No address provided');
+    }
+
+    const balance = await this.provider.getBalance(targetAddress);
+    return ethers.utils.formatEther(balance);
+  }
+
+  // Send transaction (basic example)
+  async sendTransaction(to: string, value: string): Promise<ethers.providers.TransactionResponse> {
+    if (!this.signer) {
+      throw new Error('Signer not available');
+    }
+
+    const tx = {
+      to,
+      value: ethers.utils.parseEther(value)
+    };
+
+    return await this.signer.sendTransaction(tx);
+  }
+
+  // Sign message
+  async signMessage(message: string): Promise<string> {
+    if (!this.signer) {
+      throw new Error('Signer not available');
+    }
+
+    return await this.signer.signMessage(message);
+  }
+
+  // Validate Ethereum address
+  isValidEthereumAddress(address: string): boolean {
     try {
-      const ethereum = (window as any).ethereum;
-      const chainId = await ethereum.request({ 
-        method: 'eth_chainId' 
-      });
-      return { chainId };
-    } catch (error) {
-      console.error('Get network error:', error);
-      return null;
+      return ethers.utils.isAddress(address);
+    } catch {
+      return false;
     }
   }
 
-  // Send transaction (optional - for direct sending)
-  async sendTransaction(toAddress: string, valueInEth: string) {
-    if (!this.isWeb3Available() || !this.isConnected) {
-      return { success: false, error: 'Wallet not connected' };
-    }
+  // Format address for display
+  formatAddress(address: string | null, startLength: number = 6, endLength: number = 4): string {
+    if (!address) return 'Not Connected';
+    if (!this.isValidEthereumAddress(address)) return 'Invalid Address';
+    
+    return `${address.slice(0, startLength)}...${address.slice(-endLength)}`;
+  }
 
+  // Switch network (Ethereum Mainnet)
+  async switchToMainnet(): Promise<boolean> {
     try {
-      const valueInWei = Math.floor(parseFloat(valueInEth) * 1e18).toString(16);
-      
-      const transactionParameters = {
-        to: toAddress,
-        from: this.walletAddress,
-        value: '0x' + valueInWei,
-      };
+      if (!this.isWeb3Available()) {
+        throw new Error('Web3 not available');
+      }
 
-      const ethereum = (window as any).ethereum;
-      const txHash = await ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [transactionParameters],
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x1' }], // Ethereum Mainnet
       });
 
-      return { success: true, txHash };
+      console.log('✅ Switched to Ethereum Mainnet');
+      return true;
     } catch (error: any) {
-      console.error('Send transaction error:', error);
-      return { success: false, error: error.message };
+      console.error('❌ Failed to switch network:', error);
+      
+      // If chain is not added, try to add it
+      if (error.code === 4902) {
+        return await this.addEthereumMainnet();
+      }
+      
+      return false;
+    }
+  }
+
+  // Add Ethereum Mainnet if not present
+  private async addEthereumMainnet(): Promise<boolean> {
+    try {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [
+          {
+            chainId: '0x1',
+            chainName: 'Ethereum Mainnet',
+            rpcUrls: ['https://mainnet.infura.io/v3/'],
+            blockExplorerUrls: ['https://etherscan.io'],
+            nativeCurrency: {
+              name: 'Ethereum',
+              symbol: 'ETH',
+              decimals: 18,
+            },
+          },
+        ],
+      });
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to add Ethereum Mainnet:', error);
+      return false;
     }
   }
 }
 
-// Create singleton instance
+// Create and export singleton instance
 export const web3Service = new Web3Service();

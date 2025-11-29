@@ -35,7 +35,7 @@ export default function HomeScreen() {
             resizeMode="contain"
           />
           <Text style={styles.title}>APOLLO 18</Text>
-          <Text style={styles.subtitle}>The Future of Crypto Digital Asset</Text>
+          <Text style={styles.subtitle}>The Future of Digital Asset</Text>
         </View>
 
         {/* ETH Price - CENTERED */}
@@ -56,7 +56,7 @@ export default function HomeScreen() {
             <Text style={styles.cardTitle}>Token Reservation</Text>
           </View>
           <Text style={styles.cardDescription}>
-            Reserve your APOLO tokens now during our pre-launch phase. Send ETH to our contract address 
+            Reserve your APOLO tokens now during our earlier phase. Send ETH to our contract address 
             and receive APOLO tokens at launch.
           </Text>
           
@@ -100,7 +100,7 @@ export default function HomeScreen() {
             <Text style={styles.cardTitle}>Stay Updated</Text>
           </View>
           <Text style={styles.cardDescription}>
-            Join our waitlist to get early access, updates on token launch, and exclusive content.
+            Join our waitlist to get early access, updates on token launch, and exclusive content. Currently, not avaialbe in the US, China, Nepal, Algeria, Iraq, Bolivia, Egypt, Qatar, and Tunisia. 
           </Text>
           
           <Pressable 

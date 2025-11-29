@@ -1,12 +1,51 @@
 // app/(tabs)/reserve.tsx
-import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking, Modal } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking, Modal, Clipboard } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import { useWeb3 } from '../../services/useWeb3';
 import { googleSheetsService } from '../../services/googleSheets';
+import React from 'react';
 
-export default function ReserveScreen() {
+// Simple error boundary for the component
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error('❌ ReserveScreen Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.container}>
+          <View style={styles.card}>
+            <Text style={styles.title}>Something went wrong</Text>
+            <Text style={styles.cardDescription}>
+              The app encountered an error. Please refresh the page.
+            </Text>
+            <Pressable 
+              style={styles.button}
+              onPress={() => window.location.reload()}
+            >
+              <Text style={styles.buttonText}>Refresh Page</Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function ReserveScreenContent() {
   const [email, setEmail] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [activeTab, setActiveTab] = useState<'email' | 'copy' | 'wallet' | 'verify'>('email');
@@ -20,20 +59,27 @@ export default function ReserveScreen() {
   const [usdAmount, setUsdAmount] = useState('');
   const [isConverting, setIsConverting] = useState(false);
 
-  const { address, isConnected, isLoading, error, connect, formatAddress } = useWeb3();
+  const { 
+    address, 
+    isConnected, 
+    isLoading, 
+    error, 
+    connect, 
+    disconnect, 
+    formatAddress 
+  } = useWeb3();
 
   useEffect(() => {
     if (isConnected && address) {
       setConnectedAddress(address);
       console.log('👛 Wallet connected:', address);
-    }
-  }, [isConnected, address]);
-
-  useEffect(() => {
-    if (isConnected && address && activeTab === 'wallet') {
-      setTimeout(() => {
-        setActiveTab('verify');
-      }, 1500);
+      
+      // Auto-advance to verify tab when connected
+      if (activeTab === 'wallet') {
+        setTimeout(() => {
+          setActiveTab('verify');
+        }, 1500);
+      }
     }
   }, [isConnected, address, activeTab]);
 
@@ -70,7 +116,7 @@ export default function ReserveScreen() {
 
   const copyAddress = async () => {
     try {
-      await Clipboard.setStringAsync('0x0e3541725230432653A9a3F65eB5591D16822de0');
+      Clipboard.setString('0x0e3541725230432653A9a3F65eB5591D16822de0');
       setCopiedAddress(true);
       Alert.alert('✅ Address Copied!', 'Contract address copied to clipboard. Now connect your wallet.');
       
@@ -81,7 +127,7 @@ export default function ReserveScreen() {
     }
   };
 
-  const handleWalletConnect = async (walletType: 'metamask' | 'coinbase') => {
+  const handleWalletConnect = async (walletType: 'metamask' | 'coinbase' | 'walletconnect') => {
     try {
       await connect(walletType);
     } catch (error) {
@@ -112,14 +158,23 @@ export default function ReserveScreen() {
     setIsRecording(true);
     
     try {
+      // Get current ETH price for the recording
+      const ethPrice = await googleSheetsService.getEthPrice();
+      const usdValue = parseFloat(usdAmount || '0');
+      
+      // Calculate APOLO tokens in the app (USD × 100,000)
+      const apoloDue = Math.floor(usdValue * 100000);
+      
       console.log('🎯 Starting ETH recording:', {
         email,
         wallet: currentWallet,
         ethAmount: amount,
-        usdAmount
+        usdAmount: usdValue,
+        ethPrice,
+        apoloDue
       });
 
-      // Record with USD amount if provided
+      // Record with ALL calculated values
       const enhancedResult = await googleSheetsService.recordEnhancedTransaction({
         email: email,
         wallet: currentWallet,
@@ -127,7 +182,9 @@ export default function ReserveScreen() {
         actualAmount: amount.toString(),
         txHash: 'mobile_' + Date.now(),
         fromAddress: currentWallet,
-        usdAmount: usdAmount
+        usdAmount: usdValue.toString(),
+        ethPrice: ethPrice.toString(),
+        apoloDue: apoloDue.toString()
       });
 
       console.log('📊 Enhanced transaction result:', enhancedResult);
@@ -146,9 +203,9 @@ export default function ReserveScreen() {
         setHasRecordedTransaction(true);
         
         const successMessage = `✅ ETH Recorded!\n\n` +
-          `Amount: $${usdAmount} USD\n` +
+          `Amount: $${usdValue} USD\n` +
           `Converted to: ${amount} ETH\n` +
-          `APOLO Tokens: ${Math.floor(parseFloat(usdAmount || '0') * 100000).toLocaleString()}\n` +
+          `APOLO Tokens: ${apoloDue.toLocaleString()}\n` +
           `Wallet: ${formatAddress(currentWallet)}\n\n` +
           `⚠️ Important: You must actually send ETH to our contract address:\n` +
           `0x0e3541725230432653A9a3F65eB5591D16822de0\n\n` +
@@ -249,13 +306,24 @@ export default function ReserveScreen() {
   const handleContinueToVerify = async () => {
     const currentWallet = address || connectedAddress;
     
+    if (!currentWallet) {
+      Alert.alert('Wallet Required', 'Please connect your wallet first.');
+      return;
+    }
+
+    // RECORD WALLET ADDRESS TO GOOGLE SHEETS
     if (email && currentWallet) {
       console.log('👛 Recording wallet address for:', email);
-      await googleSheetsService.recordWalletAddress({
-        email: email,
-        wallet: currentWallet,
-        source: 'mobile-app'
-      });
+      try {
+        await googleSheetsService.recordWalletAddress({
+          email: email,
+          wallet: currentWallet,
+          source: 'mobile-app'
+        });
+        console.log('✅ Wallet address recorded successfully');
+      } catch (error) {
+        console.error('❌ Failed to record wallet address:', error);
+      }
     }
     
     setActiveTab('verify');
@@ -408,14 +476,14 @@ export default function ReserveScreen() {
                     ✅ Connected: {formatAddress(address)}
                   </Text>
                   <Text style={styles.cardDescription}>
-                    Wallet connected! Please proceed to record your ETH.
+                    Your wallet is connected! Please proceed to record your ETH.
                   </Text>
                   
-                  <View style={[styles.infoBox, { backgroundColor: '#1A2A1A' }]}>
-                    <Text style={styles.infoTitle}>Next Step:</Text>
-                    <Text style={styles.infoText}>• Go to Step 4 to record your ETH</Text>
-                    <Text style={styles.infoText}>• Your wallet is ready: {formatAddress(address)}</Text>
-                    <Text style={styles.infoText}>• ETH not recorded yet</Text>
+                  <View style={[styles.infoBox, { backgroundColor: '#1A2A1A', borderColor: '#00FF00' }]}>
+                    <Text style={[styles.infoTitle, { color: '#00FF00' }]}>✅ Wallet Connected</Text>
+                    <Text style={styles.infoText}>• Your wallet: {formatAddress(address)}</Text>
+                    <Text style={styles.infoText}>• Ready to record ETH transaction</Text>
+                    <Text style={styles.infoText}>• Real address verified automatically</Text>
                   </View>
 
                   <Pressable 
@@ -429,22 +497,56 @@ export default function ReserveScreen() {
               ) : (
                 <>
                   <Text style={styles.cardDescription}>
-                    Connect the wallet you used to send ETH to our contract.
+                    Connect your wallet to record your ETH investment.
                   </Text>
-                  
+
+                  {/* Mobile WalletConnect Button */}
                   <Pressable 
                     style={[styles.button, isLoading && styles.buttonDisabled]} 
-                    onPress={() => handleWalletConnect('metamask')}
+                    onPress={() => handleWalletConnect('walletconnect')}
                     disabled={isLoading}
                   >
                     {isLoading ? (
                       <ActivityIndicator color="#000000" />
                     ) : (
-                      <Ionicons name="wallet-outline" size={20} color="#000000" />
+                      <Ionicons name="phone-portrait" size={20} color="#000000" />
                     )}
                     <Text style={styles.buttonText}>
-                      {isLoading ? 'Connecting...' : 'Connect MetaMask'}
+                      {isLoading ? 'Waiting for Wallet Connection...' : 'Connect Mobile Wallet'}
                     </Text>
+                  </Pressable>
+
+                  {isLoading && (
+                    <View style={[styles.infoBox, { backgroundColor: '#2A2A2A' }]}>
+                      <Text style={styles.infoTitle}>📱 Connection Instructions:</Text>
+                      <Text style={styles.infoText}>1. Your wallet app should open automatically</Text>
+                      <Text style={styles.infoText}>2. Approve the connection request</Text>
+                      <Text style={styles.infoText}>3. Return to this browser tab</Text>
+                      <Text style={styles.infoText}>4. Connection will complete automatically</Text>
+                      <Text style={[styles.infoText, { color: '#FFD700', marginTop: 8 }]}>
+                        ⏳ Waiting for your approval in wallet...
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={[styles.infoBox, { backgroundColor: '#2A2A2A', marginTop: 16 }]}>
+                    <Text style={styles.infoTitle}>📱 Mobile Wallet Support:</Text>
+                    <Text style={styles.infoText}>• Tap to open your wallet app</Text>
+                    <Text style={styles.infoText}>• Supports MetaMask, Coinbase, Trust</Text>
+                    <Text style={styles.infoText}>• Rainbow, and 100+ other wallets</Text>
+                    <Text style={styles.infoText}>• Real address automatically retrieved</Text>
+                  </View>
+
+                  <Text style={styles.connectorDivider}>or connect desktop wallet</Text>
+                  
+                  {/* Desktop Wallet Buttons */}
+                  <Pressable 
+                    style={[styles.secondaryButton, isLoading && styles.buttonDisabled]} 
+                    onPress={() => handleWalletConnect('metamask')}
+                    disabled={isLoading}
+                  >
+                    <Ionicons name="logo-react" size={20} color="#FFD700" />
+                    <Text style={styles.secondaryButtonText}>MetaMask (Desktop)</Text>
                   </Pressable>
 
                   <Pressable 
@@ -452,8 +554,8 @@ export default function ReserveScreen() {
                     onPress={() => handleWalletConnect('coinbase')}
                     disabled={isLoading}
                   >
-                    <Ionicons name="wallet-outline" size={20} color="#FFD700" />
-                    <Text style={styles.secondaryButtonText}>Connect Coinbase</Text>
+                    <Ionicons name="card-outline" size={20} color="#FFD700" />
+                    <Text style={styles.secondaryButtonText}>Coinbase (Desktop)</Text>
                   </Pressable>
 
                   <Pressable 
@@ -531,6 +633,7 @@ export default function ReserveScreen() {
                     setConnectedAddress(null);
                     setHasRecordedTransaction(false);
                     setActiveTab('email');
+                    disconnect();
                   }}
                 >
                   <Ionicons name="refresh" size={20} color="#FFFFFF" />
@@ -597,6 +700,15 @@ export default function ReserveScreen() {
   );
 }
 
+// Export with error boundary
+export default function ReserveScreen() {
+  return (
+    <ErrorBoundary>
+      <ReserveScreenContent />
+    </ErrorBoundary>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
   content: { flex: 1, padding: 16 },
@@ -643,7 +755,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
   },
-  // Modal Styles
+  connectorDivider: {
+    color: '#666666',
+    textAlign: 'center',
+    marginVertical: 16,
+    fontSize: 14,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',

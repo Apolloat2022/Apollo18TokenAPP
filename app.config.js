@@ -35,7 +35,10 @@ module.exports = {
     extra: {
       router: {
         origin: false
-      }
+      },
+      // ADD ENVIRONMENT VARIABLES HERE
+      w3mProjectId: process.env.EXPO_PUBLIC_W3M_PROJECT_ID,
+      gscriptUrl: process.env.EXPO_PUBLIC_GSCRIPT_URL,
     }
   }
 };

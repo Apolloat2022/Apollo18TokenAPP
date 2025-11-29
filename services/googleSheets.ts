@@ -16,6 +16,9 @@ export interface TransactionRecord {
   actualAmount?: string;
   txHash?: string;
   fromAddress?: string;
+  usdAmount?: string;     // NEW
+  ethPrice?: string;      // NEW
+  apoloDue?: string;      // NEW
 }
 
 class GoogleSheetsService {
@@ -124,7 +127,10 @@ class GoogleSheetsService {
       email: txData.email,
       amount: txData.ethAmount,
       wallet: txData.wallet,
-      txHash: txData.txHash || 'pending'
+      txHash: txData.txHash || 'pending',
+      usdAmount: txData.usdAmount,
+      ethPrice: txData.ethPrice,
+      apoloDue: txData.apoloDue
     });
 
     try {
@@ -136,7 +142,10 @@ class GoogleSheetsService {
         ethAmount: txData.ethAmount,
         actualAmount: txData.actualAmount || txData.ethAmount,
         fromAddress: txData.fromAddress || txData.wallet,
-        txHash: txData.txHash || ''
+        txHash: txData.txHash || '',
+        ...(txData.usdAmount && { usdAmount: txData.usdAmount }),
+        ...(txData.ethPrice && { ethPrice: txData.ethPrice }),
+        ...(txData.apoloDue && { apoloDue: txData.apoloDue })
       });
 
       const url = `${process.env.EXPO_PUBLIC_GSCRIPT_URL}?${params.toString()}`;
@@ -159,7 +168,10 @@ class GoogleSheetsService {
         email: txData.email,
         amount: txData.ethAmount,
         wallet: txData.wallet,
-        txHash: txData.txHash || 'unknown'
+        txHash: txData.txHash || 'unknown',
+        usdAmount: txData.usdAmount,
+        ethPrice: txData.ethPrice,
+        apoloDue: txData.apoloDue
       });
       
       return { 
