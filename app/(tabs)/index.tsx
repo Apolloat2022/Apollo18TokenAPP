@@ -38,16 +38,6 @@ export default function HomeScreen() {
           <Text style={styles.subtitle}>The Future of Digital Asset</Text>
         </View>
 
-        {/* ETH Price - CENTERED */}
-        <View style={styles.ethPriceContainer}>
-          <Text style={styles.ethPriceLabel}>Live ETH Price</Text>
-          <Text style={styles.ethPrice}>${ethPrice.toFixed(2)}</Text>
-          <Pressable style={styles.refreshButton} onPress={fetchEthPrice}>
-            <Ionicons name="refresh" size={16} color="#FFFFFF" />
-            <Text style={styles.refreshButtonText}>Refresh Price</Text>
-          </Pressable>
-        </View>
-
         {/* REMOVED: About APOLO section */}
 
         <View style={styles.card}>
