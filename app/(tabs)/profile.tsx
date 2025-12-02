@@ -74,7 +74,7 @@ export default function ProfileScreen() {
             <View style={styles.featureItem}>
               <Ionicons name="people" size={24} color="#FFD700" />
               <Text style={styles.featureTitle}>Community</Text>
-              <Text style={styles.featureDescription}>100% decentralized</Text>
+              <Text style={styles.featureDescription}>Transparent community experiment</Text>
             </View>
             <View style={styles.featureItem}>
               <Ionicons name="rocket" size={24} color="#FFD700" />
@@ -88,8 +88,8 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Token Information</Text>
           <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>Phase 11</Text>
-            <Text style={styles.infoText}>Phase 11 is currently active</Text>
+            <Text style={styles.infoLabel}>Status</Text>
+            <Text style={styles.infoText}>Community Building Phase</Text>
             
             <Text style={styles.infoLabel}>Contract Address</Text>
             <Text style={styles.contractAddress}>
@@ -97,10 +97,10 @@ export default function ProfileScreen() {
             </Text>
             
             <Text style={styles.infoLabel}>Exchange Listings</Text>
-            <Text style={styles.infoText}>Coming soon to major cryptocurrency exchanges</Text>
+            <Text style={styles.infoText}>Future listings will be pursued based on community interest and organic growth.</Text>
             
             <Text style={styles.infoLabel}>Souvenir Coin</Text>
-            <Text style={styles.infoText}>Soon you'll be able to order Apollo 18 Token coin online for souvenir</Text>
+            <Text style={styles.infoText}>A commemorative physical coin may be offered in the future, subject to community demand.</Text>
           </View>
         </View>
 
@@ -108,42 +108,49 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Our Community</Text>
           <Text style={styles.paragraph}>
-            Join our community and help build Apollo 18! Active members get exclusive roles & perks.
+            Join our community and help shape Apollo 18! Active participants are the core of this experiment.
           </Text>
           <View style={styles.stats}>
             <View style={styles.stat}>
-              <Text style={styles.statNumber}>100%</Text>
-              <Text style={styles.statLabel}>Decentralized</Text>
+              <Ionicons name="person" size={24} color="#FFD700" />
+              <Text style={styles.statLabel}>Transparent Creation</Text>
+              <Text style={styles.statDescription}>Initiated and stewarded by a solo founder</Text>
             </View>
             <View style={styles.stat}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Team Control</Text>
+              <Ionicons name="chatbubbles" size={24} color="#FFD700" />
+              <Text style={styles.statLabel}>Community-Led Future</Text>
+              <Text style={styles.statDescription}>All major directions will be proposed and voted on by holders</Text>
+            </View>
+            <View style={styles.stat}>
+              <Ionicons name="git-network" size={24} color="#FFD700" />
+              <Text style={styles.statLabel}>Evolving Governance</Text>
+              <Text style={styles.statDescription}>Goal is to transition meaningful control to the community as it grows</Text>
             </View>
           </View>
           <Text style={styles.paragraph}>
-            Our Apollo 18 APOLO community is what makes this token special. Join us and be part of the experiment!
+            Our Apollo 18 APOLO community is what makes this token unique. Join us and be part of building something from the ground up!
           </Text>
         </View>
 
         {/* Legal Notice */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Legal Notice</Text>
+          <Text style={styles.sectionTitle}>Important Disclaimer</Text>
           <View style={styles.legalCard}>
             <Ionicons name="warning" size={20} color="#FF4444" />
-            <Text style={styles.legalTitle}>⚠️ Legal Disclaimer</Text>
+            <Text style={styles.legalTitle}>⚠️ Important Disclaimer</Text>
             <Text style={styles.legalText}>
-              APOLO is a meme token with no intrinsic value, not an investment or security. 
-              While the initial concept originated from U.S.-based enthusiasts, APOLO now operates 
-              as a fully decentralized community project with no controlling entity.
+              $APOLO is a meme token created for cultural and entertainment purposes on the Ethereum blockchain. 
+              It is <Text style={styles.highlight}>not an investment</Text>, a security, or a financial product. 
+              It has <Text style={styles.highlight}>no intrinsic value</Text>, no promised utility, and no expectation of profit.
             </Text>
-            <Text style={styles.legalSubtitle}>By interacting with APOLO you acknowledge:</Text>
-            <Text style={styles.legalBullet}>• No U.S. Access - Not available to U.S. persons per Terms of Service</Text>
-            <Text style={styles.legalBullet}>• No Control - Original developers exercise no ongoing authority</Text>
-            <Text style={styles.legalBullet}>• High Risk - Potential total loss of funds; cryptocurrency is volatile</Text>
-            <Text style={styles.legalBullet}>• No Advice - The community provides no financial guidance</Text>
-            <Text style={styles.legalBullet}>• Personal Liability - You assume all risks and responsibilities</Text>
+            <Text style={styles.legalSubtitle}>By interacting with $APOLO or this website, you acknowledge and agree to the following:</Text>
+            <Text style={styles.legalBullet}>• <Text style={styles.bold}>High Risk:</Text> Cryptocurrencies are highly volatile. You should only use funds you are prepared to lose entirely.</Text>
+            <Text style={styles.legalBullet}>• <Text style={styles.bold}>No Financial Advice:</Text> Nothing here constitutes financial advice. You are solely responsible for your decisions.</Text>
+            <Text style={styles.legalBullet}>• <Text style={styles.bold}>Transparent Structure:</Text> The project was created by a solo founder. A transparent creator allocation exists to support ongoing development and marketing efforts.</Text>
+            <Text style={styles.legalBullet}>• <Text style={styles.bold}>Your Responsibility:</Text> You are solely liable for any tax implications and for ensuring your interaction complies with laws in your jurisdiction.</Text>
+            <Text style={styles.legalBullet}>• <Text style={styles.bold}>No Guarantees:</Text> There are no guarantees of future development, exchange listings, or value retention.</Text>
             <Text style={styles.legalText}>
-              This token exists for entertainment purposes only in permitted jurisdictions.
+              This project is an experimental community effort. Participate wisely.
             </Text>
           </View>
         </View>
@@ -166,7 +173,6 @@ export default function ProfileScreen() {
           
           <View style={styles.footer}>
             <Text style={styles.footerText}>© 2025 Apollo18token.com. All rights reserved.</Text>
-            <Text style={styles.footerText}>Apollo Technologies US Inc.</Text>
           </View>
         </View>
         
@@ -200,17 +206,19 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 14, fontWeight: 'bold', color: '#FFD700', marginBottom: 4 },
   infoText: { fontSize: 14, color: '#FFFFFF', marginBottom: 16, opacity: 0.8 },
   contractAddress: { fontSize: 12, color: '#FFFFFF', fontFamily: 'monospace', marginBottom: 16, backgroundColor: '#2A2A2A', padding: 8, borderRadius: 6 },
-  stats: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 16 },
-  stat: { alignItems: 'center' },
-  statNumber: { fontSize: 24, fontWeight: 'bold', color: '#FFD700', marginBottom: 4 },
-  statLabel: { fontSize: 12, color: '#FFFFFF', opacity: 0.8 },
+  stats: { marginVertical: 16 },
+  stat: { backgroundColor: '#1A1A1A', padding: 16, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
+  statLabel: { fontSize: 14, fontWeight: 'bold', color: '#FFD700', marginTop: 8, marginBottom: 4, textAlign: 'center' },
+  statDescription: { fontSize: 12, color: '#FFFFFF', textAlign: 'center', opacity: 0.8, lineHeight: 16 },
   legalCard: { backgroundColor: '#1A1A1A', padding: 20, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: '#FF4444' },
   legalTitle: { fontSize: 16, fontWeight: 'bold', color: '#FF4444', marginBottom: 8 },
   legalText: { fontSize: 14, color: '#FFFFFF', lineHeight: 20, marginBottom: 12, opacity: 0.8 },
   legalSubtitle: { fontSize: 14, fontWeight: '600', color: '#FFFFFF', marginBottom: 8 },
-  legalBullet: { fontSize: 14, color: '#FFFFFF', lineHeight: 20, marginBottom: 4, opacity: 0.8, marginLeft: 8 },
+  legalBullet: { fontSize: 14, color: '#FFFFFF', lineHeight: 20, marginBottom: 8, opacity: 0.8, marginLeft: 8 },
   contactButton: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, padding: 12, backgroundColor: '#1A1A1A', borderRadius: 8 },
   contactText: { color: '#FFD700', fontSize: 14 },
   footer: { marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#333333' },
   footerText: { fontSize: 12, color: '#666666', textAlign: 'center', marginBottom: 4 },
+  highlight: { color: '#FF4444', fontWeight: 'bold' },
+  bold: { fontWeight: 'bold' },
 });

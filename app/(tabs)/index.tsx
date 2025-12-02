@@ -53,11 +53,10 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="rocket" size={24} color="#FFD700" />
-            <Text style={styles.cardTitle}>Token Reservation</Text>
+            <Text style={styles.cardTitle}>Spot Reservation</Text>
           </View>
           <Text style={styles.cardDescription}>
-            Reserve your APOLO tokens now during our earlier phase. Send ETH to our contract address 
-            and receive APOLO tokens at launch.
+            Reserve your spot now during our earlier phase. 
           </Text>
           
           <Pressable 
@@ -65,21 +64,21 @@ export default function HomeScreen() {
             onPress={() => router.push('/reserve')}
           >
             <Ionicons name="flash" size={20} color="#000000" />
-            <Text style={styles.buttonText}>Reserve APOLO Tokens</Text>
+            <Text style={styles.buttonText}>Reserve your spot</Text>
           </Pressable>
         </View>
 
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="wallet" size={24} color="#FFD700" />
-            <Text style={styles.cardTitle}>Contract Address</Text>
+            <Text style={styles.cardTitle}>Eth Address</Text>
           </View>
           <Text style={styles.cardDescription}>
-            Our official Ethereum contract address for token reservations:
+            Our official Ethereum reserve address for spot reservations:
           </Text>
           
           <View style={styles.addressContainer}>
-            <Text style={styles.addressText}>0x0e3541725230432653A9a3F65eB5591D16822de0</Text>
+            <Text style={styles.addressText}>Eth address</Text>
           </View>
 
           <Pressable 
@@ -100,7 +99,7 @@ export default function HomeScreen() {
             <Text style={styles.cardTitle}>Stay Updated</Text>
           </View>
           <Text style={styles.cardDescription}>
-            Join our waitlist to get early access, updates on token launch, and exclusive content. Currently, not avaialbe in the US, China, Nepal, Algeria, Iraq, Bolivia, Egypt, Qatar, and Tunisia. 
+            Join our waitlist to get early access, updates on token launch, and exclusive content. Currently, not avaialbe in China, Nepal, Algeria, Iraq, Bolivia, Egypt, Qatar, and Tunisia. 
           </Text>
           
           <Pressable 
