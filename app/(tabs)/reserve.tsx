@@ -1,4 +1,4 @@
-// app/(tabs)/reserve.tsx
+	// app/(tabs)/reserve.tsx
 import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking, Modal, Clipboard } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -103,7 +103,7 @@ function ReserveScreenContent() {
         source: 'mobile-app'
       });
 
-      Alert.alert('✅ Email Verified!', 'Your email has been recorded. Please copy the contract address.');
+      Alert.alert('✅ Email Verified!', 'Your email has been recorded. Please copy the Eth address.');
       setActiveTab('copy');
       
     } catch (error) {
@@ -118,7 +118,7 @@ function ReserveScreenContent() {
     try {
       Clipboard.setString('0x0e3541725230432653A9a3F65eB5591D16822de0');
       setCopiedAddress(true);
-      Alert.alert('✅ Address Copied!', 'Contract address copied to clipboard. Now connect your wallet.');
+      Alert.alert('✅ Address Copied!', 'Eth address copied to clipboard. Now connect your wallet.');
       
       setTimeout(() => setCopiedAddress(false), 3000);
       setActiveTab('wallet');
@@ -340,8 +340,8 @@ function ReserveScreenContent() {
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={styles.title}>Reserve APOLO Tokens</Text>
-            <Text style={styles.subtitle}>Complete these steps to reserve your tokens</Text>
+            <Text style={styles.title}>Reserve your spot</Text>
+            <Text style={styles.subtitle}>Complete these steps to reserve your spot</Text>
           </View>
 
           <View style={styles.progressContainer}>
@@ -410,11 +410,11 @@ function ReserveScreenContent() {
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Ionicons name="copy" size={24} color="#FFD700" />
-                <Text style={styles.cardTitle}>Step 2: Copy Contract Address</Text>
+                <Text style={styles.cardTitle}>Step 2: Copy Eth Address</Text>
               </View>
               
               <Text style={styles.cardDescription}>
-                Copy our contract address. You will send ETH to this address.
+                Copy Eth address. 
               </Text>
 
               <View style={styles.addressContainer}>
@@ -578,7 +578,7 @@ function ReserveScreenContent() {
               </View>
               
               <Text style={styles.cardDescription}>
-                Record your ETH to complete your APOLO reservation.
+                Record your ETH to complete your reservation.
               </Text>
 
               {hasRecordedTransaction ? (
@@ -586,8 +586,8 @@ function ReserveScreenContent() {
                   <Text style={[styles.infoTitle, { color: '#00FF00' }]}>✅ ETH Recorded!</Text>
                   <Text style={styles.infoText}>📧 Email: {email}</Text>
                   <Text style={styles.infoText}>👛 Wallet: {formatAddress(address || connectedAddress)}</Text>
-                  <Text style={styles.infoText}>🎯 Status: APOLO tokens reserved</Text>
-                  <Text style={styles.infoText}>⏰ Delivery: After token launch</Text>
+                  <Text style={styles.infoText}>🎯 Status: Spot reserved</Text>
+                  <Text style={styles.infoText}>⏰ Delivery: After launch</Text>
                 </View>
               ) : (
                 <View style={styles.infoBox}>
