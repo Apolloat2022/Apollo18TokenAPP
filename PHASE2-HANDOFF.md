@@ -1,4 +1,9 @@
-# Phase 2 Handoff — backend done (Opus), client next (Sonnet)
+# Phase 2 Handoff — backend (Opus) and client (Sonnet) both done
+
+**Status: Phase 2a + 2b both committed and pushed (`ccacb15`, `34b20f1`).
+Code-complete but UNTESTED — nothing has run against a real Supabase/Stripe/
+Coinbase account yet. Owner provisioning (checklist below) is the remaining
+blocker before this can be exercised end-to-end.**
 
 Status as of 2026-07-18. Backing plan: PLAN.md v3.1. Two payment rails: card
 (Stripe) and ETH (Coinbase Commerce), both at USD prices, both fulfilling
@@ -32,27 +37,41 @@ identity (Stripe session id / Coinbase charge id), not the event id, because
 Coinbase emits multiple events per charge. First fulfillment wins; every later
 call is a no-op. Same guarantee for Stripe redeliveries.
 
-## What is NEXT (Phase 2b — client, good Sonnet task)
+## What is DONE (Phase 2b — client)
 
-1. **Supabase client + auth context** (`services/supabase.ts` + a provider):
-   read `supabaseUrl` / `supabaseAnonKey` from `expo-constants`
-   (`Constants.expoConfig.extra`, already wired in `app.config.js`). Email
-   magic-link sign-in. Expose the session's access token.
-2. **Wire checkout**: in `app/(tabs)/reserve.tsx`, replace the simulated
-   `proceedToPayment` (the `setTimeout` + `googleSheetsService` call) with a
-   `POST` to `/api/checkout` (card) or `/api/eth-checkout` (ETH), sending
-   `Authorization: Bearer <token>` and `{ sku }`, then redirect the browser to
-   the returned `url`. Add a "Pay by card" / "Pay with ETH" choice per item.
-3. **Dashboard tab** (rename `profile.tsx` → Dashboard in `app/_layout.tsx`):
-   show credit balance (`credit_balances` view), purchase history
-   (`purchases`), and a "buy more" link to Pricing. Requires sign-in.
-4. **Course gating**: in `app/(tabs)/course.tsx`, replace the mock `ownedSkus`
-   with a real query of `entitlements` for the signed-in user.
-5. **Handle redirect params**: `/profile?checkout=success` and
-   `/reserve?checkout=cancelled` (set by both checkout endpoints).
+1. **Supabase client + auth context**: `services/supabase.ts` (reads
+   `supabaseUrl`/`supabaseAnonKey` from `expo-constants`; falls back to a
+   placeholder so the app doesn't crash before Supabase is provisioned) +
+   `hooks/useAuth.tsx` (magic-link sign-in/out, session, access token),
+   wrapped around the app in `app/_layout.tsx`.
+2. **Checkout wired**: `app/(tabs)/reserve.tsx` now signs the user in first,
+   then `POST`s `/api/checkout` (card) or `/api/eth-checkout` (ETH) with
+   `Authorization: Bearer <token>` + `{ sku }`, and redirects to the returned
+   `url`. Replaced the old simulated `setTimeout` payment entirely.
+3. **Dashboard tab**: `profile.tsx` renamed to Dashboard (`app/_layout.tsx`
+   tab label), rebuilt to show real balance + purchase history via
+   `services/ledger.ts`, sign-in/out, and `?checkout=success` handling. Also
+   removed the last of the old crypto/SEC-CFTC/contract-address copy that had
+   survived Phase 0/1 in this specific file.
+4. **Course gating**: `app/(tabs)/course.tsx` queries real `entitlements` via
+   `services/ledger.ts` instead of a hardcoded mock; shows a sign-in hint when
+   logged out.
+5. **Redirect params**: both `?checkout=success` (Dashboard) and
+   `?checkout=cancelled` (Pricing) are handled.
 
-Note: sign-in must exist before checkout works — the endpoints 401 without a
-valid Supabase token. Build auth (step 1) first.
+Two issues found and fixed while wiring the client (both in the commit):
+- **Schema security fix**: `credit_balances` was a plain view, which
+  Postgres runs with the *owner's* privileges by default — bypassing RLS on
+  `ledger_entries` and letting any signed-in user read every user's balance.
+  Added `security_invoker = true` + explicit `authenticated`-only grants.
+  **If you already ran the old `schema.sql` in a live Supabase project,
+  re-run the updated file** (or just `create or replace view` the fixed
+  block) before relying on the balance view.
+- **White-screen crash fix**: `createClient()` throws synchronously on an
+  empty Supabase URL, which would have crashed the entire app on load before
+  Supabase is set up (this repo hit exactly this failure mode before —
+  commit `c9a30b2`). Now falls back to a placeholder so the app renders; only
+  auth/checkout/dashboard features fail gracefully until real keys are set.
 
 ## Owner provisioning checklist (before 2b can be TESTED)
 
