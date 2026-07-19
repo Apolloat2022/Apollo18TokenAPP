@@ -134,6 +134,14 @@ function ClerkEmailCodeFlow() {
           </Pressable>
         </>
       )}
+
+      {/* Required by Clerk's Bot Sign-up Protection for custom (non-prebuilt)
+          flows: without this element in the DOM, Clerk's Smart CAPTCHA can't
+          attach and signUp.create()/verification calls get rejected server-side.
+          nativeID renders as the DOM id on web via react-native-web; Clerk
+          shows/hides its widget inside this element as needed, so it must be
+          present before signUp.create() is called, i.e. from first render. */}
+      <View nativeID="clerk-captcha" />
     </View>
   );
 }
