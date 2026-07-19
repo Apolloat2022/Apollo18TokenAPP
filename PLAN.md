@@ -1,6 +1,6 @@
 # Apollo18 Pivot Plan: From Crypto Token to AI Usage Credits
 
-**Version 3.1 — July 2026. Supersedes v3.0 (adds ETH as a payment method; owner decision 2026-07-18) and the "Digital Tool Transition" roadmap (v2.1).**
+**Version 3.2 — July 2026. Supersedes v3.1 (swaps Supabase for Neon + Clerk; owner decision 2026-07-18 — owner already has 2 free Supabase projects and free tier caps at 2) and the "Digital Tool Transition" roadmap (v2.1).**
 
 Apollo18 stops being a crypto token. "Tokenization for AI usage" now means **Apollo18 Credits**: a prepaid, off-chain, ledger-based unit that customers buy at USD prices — by card (Stripe Checkout) or by paying the USD price in ETH (Coinbase Commerce hosted checkout) — and spend on AI-powered features (course AI tutor, prompt playground, agent runs) and, later, on metered API access. Apollo18 issues no token and runs nothing on-chain: ETH is accepted only as a payment rail through a hosted processor, with no wallet-connect code in the app and no contract address of our own.
 
@@ -57,17 +57,22 @@ Expo/RN Web (Vercel)                 Serverless API (Vercel functions /api)
 │ Course + Tutor   │           │ /api/eth-checkout → Coinbase Commerce │
 │ Dashboard        │           │ /api/stripe-webhook → credit ledger   │
 └──────────────────┘           │ /api/coinbase-webhook → credit ledger │
+        │                      │ /api/dashboard → own balance/history  │
         │                      │ /api/ai/*      → Anthropic proxy      │
         │                      │                  (debit credits)      │
-        │ Clerk/Supabase Auth  └──────────────┬───────────────────────┘
-        ▼                                     ▼
-   Session JWT                     Supabase Postgres
-                                   users, ledger_entries (append-only),
-                                   purchases, usage_events, api_keys
+        │ Clerk session token  └──────────────┬───────────────────────┘
+        ▼                                     ▼ (verified user_id only,
+   @clerk/clerk-expo                            no client DB access)
+                                       Neon Postgres
+                                   users (Clerk id), ledger_entries
+                                   (append-only), purchases, entitlements,
+                                   usage_events, api_keys
 ```
 
 Key decisions for the implementer:
-- **Auth**: Supabase Auth (email magic link) — one vendor for auth + DB. Clerk is acceptable if Supabase Auth fights Expo web; decide in Phase 2, don't build both.
+- **Database (v3.2): Neon**, not Supabase. Owner already has 2 free Supabase projects and the free tier caps at 2 — rather than pay or cram Apollo18 into a shared project, Neon's free tier allows 100 projects at $0 (0.5 GB storage + 100 CU-hours/project/month, confirmed from neon.com/pricing 2026-07-18), which is ample at this scale. Neon is vanilla Postgres — the `fulfill_purchase()` idempotent SQL function and the ledger/purchases/entitlements table design from v3.1 carry over essentially unchanged; only the RLS/grants layer is replaced (see access pattern below).
+- **Auth (v3.2): Clerk**, not Supabase Auth. Free Hobby tier: unlimited apps, 50,000 monthly retained users, magic-link email included (confirmed from clerk.com/pricing 2026-07-18) — this was already the plan's pre-approved fallback. Use `@clerk/clerk-expo` on the client; verify the Clerk session token server-side in every `/api/*` route.
+- **Access pattern (v3.2 — a real change, not just a vendor swap)**: Supabase's model let the browser query Postgres directly, gated by Row-Level Security. Neon has no equivalent RLS-to-auth bridge, so **all database access now goes through our own `/api/*` routes** — the browser never holds a Postgres credential. Each route verifies the Clerk session, then queries with an explicit `WHERE user_id = $1` using the verified id. This is a deliberate hardening, not just a workaround: a Phase 2a-era bug (a view that bypassed RLS and would have let any signed-in user read every other user's balance) is structurally impossible under this pattern, since there's no direct-from-browser query surface for RLS to have protected in the first place. `credit_balances`/`purchases`/`entitlements` stay as plain tables/views with no client-facing grants; a new `/api/dashboard` route (or similar) returns the signed-in user's own balance + history + entitlements.
 - **Ledger**: append-only `ledger_entries` (`user_id, delta, reason, ref_id, created_at`); balance = SUM(delta), cached materialized view if needed. Never store a mutable balance column as source of truth.
 - **AI gateway**: a Vercel serverless route wrapping the Anthropic SDK (default `claude-sonnet-5` for tutor/playground). Debit = `ceil((input_tokens*in_rate + output_tokens*out_rate) * margin / $0.01)`. Reject the call up-front if balance < a conservative estimate; reconcile after the response. LiteLLM proxy is overkill at this scale — a single route file is enough.
 - **Payments/tax**: two rails, both at USD prices, both fulfilled through the same idempotent `fulfill_purchase()` path (keyed on the processor's event id):
@@ -96,13 +101,42 @@ Key decisions for the implementer:
 7. Acceptance: deployed Vercel site shows zero crypto references; Lighthouse sanity pass.
 
 ### Phase 2 — Auth, ledger, and Stripe (architecture-sensitive — good Opus task)
-1. Supabase project: `users` (from auth), `purchases`, `ledger_entries`, RLS on all tables.
-2. `/api/checkout`: creates Stripe Checkout Session (credit packs + course SKU), `automatic_tax: enabled`.
-3. `/api/stripe-webhook`: verifies signature, idempotent insert into `purchases` + `ledger_entries` (credit grant or course entitlement).
-4. `/api/eth-checkout` + `/api/coinbase-webhook` (v3.1): Coinbase Commerce charge creation and fulfillment for ETH payers — same `fulfill_purchase()` call, idempotency keyed on the Coinbase event id (widen `purchases.stripe_event_id` to a processor-agnostic `event_id` + `processor` column).
-5. Dashboard tab: balance, transaction history, "buy more" — replaces the wallet profile. Pricing page offers "Pay by card" and "Pay with ETH" per SKU.
-6. Course tab gates on entitlement instead of token ownership.
-7. Acceptance: test-mode purchase end-to-end on BOTH rails (checkout → webhook → balance visible); webhook replay does not double-credit on either rail.
+
+**Status (v3.2, 2026-07-18): built once on Supabase (2a by Opus, 2b by Sonnet, both
+committed/pushed), then blocked — owner already has 2 free Supabase projects and
+the free tier caps at 2. Rebuilding on Neon + Clerk per §3's revised architecture.
+Needs Opus: this redo touches the idempotent-fulfillment call sites and every
+payment endpoint's auth verification, i.e. exactly the correctness-sensitive
+surface this phase was assigned to Opus for in the first place — and the first
+Supabase pass already had one real RLS bug found while wiring the client
+(a view that would have let any signed-in user read every user's balance).**
+
+1. Neon project (free tier, well under the 100-project cap): re-run a Neon-adapted
+   `supabase/schema.sql` — the `purchases`/`ledger_entries`/`entitlements` tables
+   and the `fulfill_purchase()` function port over almost unchanged; **drop the
+   RLS policies and view `security_invoker`/grants entirely** — there is no
+   client-facing query surface anymore (see §3 access pattern), so per-row
+   authorization moves into `WHERE user_id = $1` in the API routes instead.
+2. Clerk: `@clerk/clerk-expo` on the client (replaces `hooks/useAuth.tsx` and
+   `services/supabase.ts`); every `/api/*` route verifies the Clerk session
+   token server-side instead of a Supabase JWT.
+3. `/api/checkout` + `/api/stripe-webhook`: same shape as before, but the
+   webhook writes to Neon via a Postgres client (`@neondatabase/serverless` or
+   `pg`) instead of `supabaseAdmin.rpc(...)`.
+4. `/api/eth-checkout` + `/api/coinbase-webhook`: same swap — Coinbase charge
+   creation/fulfillment unchanged in shape, DB write goes through the Neon
+   client. Idempotency still keyed on `(processor, reference)`.
+5. **New**: `/api/dashboard` (or similar) — authenticated route returning the
+   caller's own balance + purchase history + entitlements in one call, since
+   `services/ledger.ts` can no longer query Postgres directly from the browser.
+   Rewrite `app/(tabs)/profile.tsx` (Dashboard) and `app/(tabs)/course.tsx` to
+   call this route instead of `services/ledger.ts`'s direct Supabase queries.
+6. `reserve.tsx`: swap `useAuth()` (Supabase) for Clerk's hooks; checkout POST
+   bodies/flow are otherwise unchanged.
+7. Acceptance: test-mode purchase end-to-end on BOTH rails (checkout → webhook
+   → balance visible via `/api/dashboard`); webhook replay does not
+   double-credit on either rail; confirm no route ever exposes a Postgres
+   connection string or allows a client to query another user's rows.
 
 ### Phase 3 — Metered AI features (Opus for the gateway, Sonnet for UI)
 1. `/api/ai/tutor` and `/api/ai/playground`: authenticated, streaming, Anthropic-backed; debit credits per call as specified in §3; write `usage_events` rows (model, in/out tokens, credits).
@@ -127,6 +161,6 @@ Key decisions for the implementer:
 ## 6. Hand-off Notes
 
 - **Sonnet**: Phases 0 and 1 (mechanical cleanup + UI/copy), Phase 3 UI. Low ambiguity, file lists above are explicit.
-- **Opus**: Phase 2 and the Phase 3 gateway (idempotent webhook, append-only ledger, streaming debit reconciliation). These have correctness stakes — double-crediting and race-y debits are the failure modes to design against.
+- **Opus**: Phase 2 and the Phase 3 gateway (idempotent webhook, append-only ledger, streaming debit reconciliation). These have correctness stakes — double-crediting and race-y debits are the failure modes to design against. This includes the v3.2 Supabase→Neon+Clerk redo (§4 Phase 2) — a vendor swap that also removes the RLS-based access pattern, touching every payment endpoint's auth verification.
 - Keep phases as separate PRs; Phase 0 must land before Phase 1 to avoid rebasing UI work over deleted services.
-- Env vars to provision before Phase 2: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`; for the ETH rail (v3.1): `COINBASE_COMMERCE_API_KEY`, `COINBASE_COMMERCE_WEBHOOK_SECRET`.
+- Env vars to provision before Phase 2 (v3.2): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEON_DATABASE_URL` (or equivalent pooled connection string), `CLERK_SECRET_KEY`, `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`; for the ETH rail: `COINBASE_COMMERCE_API_KEY`, `COINBASE_COMMERCE_WEBHOOK_SECRET`. (Supabase vars from v3.1 are obsolete.)
