@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { googleSheetsService } from '../../services/googleSheets';
+import { catalog, CatalogItem } from '../../data/catalog';
 import React from 'react';
 
 // Simple error boundary for the component
@@ -74,7 +75,7 @@ function ReserveScreenContent() {
     }
   };
 
-  const proceedToPayment = async (amount: number) => {
+  const proceedToPayment = async (item: CatalogItem) => {
     setIsRecording(true);
     try {
       // Simulate Stripe Payment Delay
@@ -84,10 +85,10 @@ function ReserveScreenContent() {
         email: email,
         wallet: 'stripe_customer',
         ethAmount: '0',
-        actualAmount: amount.toString(),
-        txHash: 'stripe_' + Date.now(),
+        actualAmount: item.priceUsd.toString(),
+        txHash: `stripe_${item.sku}_${Date.now()}`,
         fromAddress: 'STRIPE',
-        usdAmount: amount.toString(),
+        usdAmount: item.priceUsd.toString(),
         ethPrice: '0'
       });
 
@@ -162,20 +163,19 @@ function ReserveScreenContent() {
                 <Text style={styles.cardTitle}>Step 2: Choose Package</Text>
               </View>
 
-              {[
-                { label: 'Basic Course', price: 99 },
-                { label: 'Pro Bundle', price: 299 },
-                { label: 'Enterprise Suite', price: 1499 }
-              ].map((item) => (
+              {catalog.filter((item) => !item.comingSoon).map((item) => (
                 <Pressable
-                  key={item.label}
+                  key={item.sku}
                   style={styles.packageCard}
-                  onPress={() => proceedToPayment(item.price)}
+                  onPress={() => proceedToPayment(item)}
                   disabled={isRecording}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.packageLabel}>{item.label}</Text>
-                    <Text style={styles.packagePrice}>${item.price.toFixed(2)} USD</Text>
+                    <Text style={styles.packageLabel}>{item.title}</Text>
+                    <Text style={styles.packagePrice}>
+                      ${item.priceUsd.toFixed(2)} USD
+                      {item.type === 'credits' ? ` · ${item.credits.toLocaleString()} credits` : ''}
+                    </Text>
                   </View>
                   {isRecording ? <ActivityIndicator size="small" color="#D4AF37" /> : <Ionicons name="chevron-forward" size={20} color="#D4AF37" />}
                 </Pressable>

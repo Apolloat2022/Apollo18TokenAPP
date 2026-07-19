@@ -27,12 +27,21 @@ This document is a build plan for hand-off. **Do not treat the current codebase'
 
 ## 2. Product Definition (what Apollo18 sells after the pivot)
 
+Apollo18 is a **platform, not a single course**: one credits balance and one checkout that any Apollo product can sell through. The catalog (courses + credit packs) lives in `data/catalog.ts` as SKU entries that map 1:1 to Stripe products in Phase 2 — the prompt-engineering course is just the first entry, not the product.
+
 | Offering | Model |
 |---|---|
-| Prompt Engineering Course | One-time USD purchase (Stripe Checkout) → unlocks course portal |
-| Apollo18 Credits | Prepaid packs (e.g., 500 / 2,500 / 10,000 credits) |
+| Course catalog (Prompt Engineering Mastery first; more portfolio courses later) | One-time USD purchase per course SKU (Stripe Checkout) → unlocks that course in the portal |
+| Apollo18 Credits | Prepaid packs (500 / 2,500 / 10,000 credits) |
 | AI Tutor & Prompt Playground | Spends credits per interaction (metered on real model tokens) |
+| Metered AI tools from other portfolio apps | Same ledger + gateway (e.g., pdf-audiobook-converter conversions, course student runs) |
 | Developer API keys (Phase 4) | Credits spent programmatically via Apollo18 gateway |
+
+Cross-app integration paths (both already implied by §3's architecture):
+- **Shared account (Phase 2)**: other apps authenticate against the same Supabase project, so one credit balance spends across the whole portfolio.
+- **Per-app API keys (Phase 4)**: existing apps — including the Python ones — call the Apollo18 gateway with their own key, without adopting its auth stack.
+
+Candidate first integrations from `C:\Projects\APPS`: **PromptCraft Pro** (root app — richest existing course content, could supply the real curriculum), **agentic-ai-course** (second catalog course; rotate its leaked GitHub credentials first — see APPS/HANDOFF.md), **AI-agentic-loop** (students spend Apollo18 credits through the gateway instead of bringing their own API key), **pdf-audiobook-converter** (per-conversion credit metering).
 
 The word "token" survives only in the AI sense (model tokens). All customer-facing currency language is "credits."
 
