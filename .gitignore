@@ -40,3 +40,4 @@ coverage/
 /build
 /.expo
 .vercel
+.firecrawl/
