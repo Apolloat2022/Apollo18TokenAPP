@@ -57,7 +57,12 @@ create table if not exists public.entitlements (
 -- Balance view
 -- ---------------------------------------------------------------------------
 
-create or replace view public.credit_balances as
+-- security_invoker is required here: Postgres views otherwise run with the
+-- view OWNER's privileges (bypassing ledger_entries' RLS), which would let
+-- any authenticated client read every user's balance instead of only their
+-- own. With security_invoker = true the view respects the caller's RLS.
+create or replace view public.credit_balances
+  with (security_invoker = true) as
   select user_id, coalesce(sum(delta), 0)::integer as balance
   from public.ledger_entries
   group by user_id;
@@ -139,3 +144,9 @@ create policy "own ledger readable"
 create policy "own entitlements readable"
   on public.entitlements for select
   using (auth.uid() = user_id);
+
+-- Explicit grants: readable by signed-in users only (never anon). RLS above
+-- still restricts each authenticated user to their own rows; these grants
+-- just make table-level access non-default-dependent.
+grant select on public.purchases, public.ledger_entries, public.entitlements, public.credit_balances
+  to authenticated;

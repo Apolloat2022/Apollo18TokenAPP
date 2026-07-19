@@ -4,10 +4,13 @@ import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { catalog, CourseItem } from '../../data/catalog';
+import { useAuth } from '../../hooks/useAuth';
+import { getOwnedCourseSkus } from '../../services/ledger';
 
 const courses = catalog.filter((item): item is CourseItem => item.type === 'course');
 
 export default function CourseScreen() {
+  const { session } = useAuth();
   const [ownedSkus, setOwnedSkus] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCredentialModal, setShowCredentialModal] = useState(false);
@@ -15,22 +18,29 @@ export default function CourseScreen() {
 
   const router = useRouter();
 
-  // Simulated entitlement check
   useEffect(() => {
+    let cancelled = false;
+
     const checkAccess = async () => {
-      // TODO(Phase 2): replace with a real Supabase entitlement lookup
-      // keyed on the authenticated user, populated by the Stripe webhook.
-
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // MOCK ACCESS: owned course SKUs would come from a verified source.
-      setOwnedSkus(['course-prompt-mastery']);
-      setLoading(false);
+      setLoading(true);
+      if (!session) {
+        // Signed-out visitors own nothing; every course shows as locked.
+        if (!cancelled) {
+          setOwnedSkus([]);
+          setLoading(false);
+        }
+        return;
+      }
+      const skus = await getOwnedCourseSkus();
+      if (!cancelled) {
+        setOwnedSkus(skus);
+        setLoading(false);
+      }
     };
 
     checkAccess();
-  }, []);
+    return () => { cancelled = true; };
+  }, [session]);
 
   const claimCredential = (moduleName: string) => {
     setLastCompletedModule(moduleName);
@@ -52,6 +62,11 @@ export default function CourseScreen() {
           <Text style={styles.courseBadge}>APOLLO18 ACADEMY</Text>
           <Text style={styles.title}>Course Catalog</Text>
           <Text style={styles.subtitle}>One credits balance, every Apollo course</Text>
+          {!session && (
+            <Text style={[styles.subtitle, { color: '#00A896', marginTop: 8 }]}>
+              Sign in on the Dashboard tab to unlock courses you've purchased.
+            </Text>
+          )}
         </View>
 
         {courses.map((course) => {

@@ -37,7 +37,6 @@ module.exports = {
         origin: false
       },
       // ADD ENVIRONMENT VARIABLES HERE
-      gscriptUrl: process.env.EXPO_PUBLIC_GSCRIPT_URL,
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     }

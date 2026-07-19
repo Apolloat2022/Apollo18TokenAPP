@@ -2,10 +2,11 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { AuthProvider } from '../hooks/useAuth';
 
 export default function RootLayout() {
   return (
-    <>
+    <AuthProvider>
       <StatusBar style="light" />
       <Tabs
         screenOptions={{
@@ -47,13 +48,13 @@ export default function RootLayout() {
         <Tabs.Screen
           name="(tabs)/profile"
           options={{
-            title: 'Profile',
+            title: 'Dashboard',
             tabBarIcon: ({ size, color }) => (
               <Ionicons name="person" size={size} color={color} />
             ),
           }}
         />
       </Tabs>
-    </>
+    </AuthProvider>
   );
 }
