@@ -11,11 +11,11 @@ export default function RootLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: '#000000',
-            borderTopColor: '#333333',
+            backgroundColor: '#0B0C10',
+            borderTopColor: '#1F2833',
           },
-          tabBarActiveTintColor: '#FFD700',
-          tabBarInactiveTintColor: '#666666',
+          tabBarActiveTintColor: '#D4AF37',
+          tabBarInactiveTintColor: '#C5C6C7',
         }}>
         <Tabs.Screen
           name="(tabs)/index"
@@ -29,9 +29,18 @@ export default function RootLayout() {
         <Tabs.Screen
           name="(tabs)/reserve"
           options={{
-            title: 'Reserve',
+            title: 'Checkout',
             tabBarIcon: ({ size, color }) => (
-              <Ionicons name="card" size={size} color={color} />
+              <Ionicons name="cart" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="(tabs)/course"
+          options={{
+            title: 'Course',
+            tabBarIcon: ({ size, color }) => (
+              <Ionicons name="school" size={size} color={color} />
             ),
           }}
         />
