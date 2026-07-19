@@ -1,4 +1,4 @@
-// app/(tabs)/reserve.tsx
+// app/(tabs)/pricing.tsx
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +21,7 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    console.error('❌ ReserveScreen Error:', error, errorInfo);
+    console.error('❌ PricingScreen Error:', error, errorInfo);
   }
 
   render() {
@@ -58,7 +58,7 @@ async function goToExternalCheckout(url: string) {
   }
 }
 
-function ReserveScreenContent() {
+function PricingScreenContent() {
   const { isSignedIn, email, getToken } = useAuth();
   const params = useLocalSearchParams<{ checkout?: string }>();
   const [payingSkuRail, setPayingSkuRail] = useState<string | null>(null);
@@ -155,10 +155,10 @@ function ReserveScreenContent() {
   );
 }
 
-export default function ReserveScreen() {
+export default function PricingScreen() {
   return (
     <ErrorBoundary>
-      <ReserveScreenContent />
+      <PricingScreenContent />
     </ErrorBoundary>
   );
 }

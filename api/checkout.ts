@@ -47,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       client_reference_id: userId,
       metadata: { user_id: userId, sku },
       success_url: `${base}/profile?checkout=success`,
-      cancel_url: `${base}/reserve?checkout=cancelled`,
+      cancel_url: `${base}/pricing?checkout=cancelled`,
     });
     return res.status(200).json({ url: session.url });
   } catch (err) {

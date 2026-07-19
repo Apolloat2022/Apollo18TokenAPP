@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         local_price: { amount: serverSku.priceUsd.toFixed(2), currency: 'USD' },
         metadata: { user_id: userId, sku },
         redirect_url: `${base}/profile?checkout=success`,
-        cancel_url: `${base}/reserve?checkout=cancelled`,
+        cancel_url: `${base}/pricing?checkout=cancelled`,
       }),
     });
 

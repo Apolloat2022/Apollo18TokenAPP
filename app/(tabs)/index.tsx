@@ -52,7 +52,7 @@ export default function HomeScreen() {
 
           <Pressable
             style={styles.button}
-            onPress={() => router.push('/reserve')}
+            onPress={() => router.push('/pricing')}
           >
             <Ionicons name="card" size={20} color="#000000" />
             <Text style={styles.buttonText}>Get Credits</Text>

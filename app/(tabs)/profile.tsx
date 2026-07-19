@@ -80,7 +80,7 @@ export default function DashboardScreen() {
                 <Text style={styles.balanceText}>{(balance ?? 0).toLocaleString()} credits</Text>
               )}
               <Text style={styles.paragraph}>Signed in as {email}</Text>
-              <Pressable style={styles.button} onPress={() => router.push('/reserve')}>
+              <Pressable style={styles.button} onPress={() => router.push('/pricing')}>
                 <Ionicons name="add-circle-outline" size={18} color="#000000" />
                 <Text style={styles.buttonText}> Buy More</Text>
               </Pressable>

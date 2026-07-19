@@ -46,7 +46,7 @@ Typecheck (`tsc --noEmit`) and web build (`expo export -p web`) both pass.
   signed-out `UnconfiguredBridge`, so the app never crashes pre-provisioning.
 - `components/SignInPanel.tsx` — Clerk email-code sign-in/sign-up flow.
 - `services/api.ts` — `fetchDashboard()` + `createCheckout()` client helpers.
-- `reserve.tsx`, `profile.tsx` (Dashboard), `course.tsx` — use the wrapper +
+- `pricing.tsx` (was `reserve.tsx`), `profile.tsx` (Dashboard), `course.tsx` — use the wrapper +
   `/api/dashboard`; no direct DB access.
 - Removed: `services/supabase.ts`, `services/ledger.ts`, `api/_lib/supabase.ts`,
   `supabase/schema.sql`, and the `@supabase/supabase-js` dep. Added

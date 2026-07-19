@@ -119,7 +119,7 @@ export default function CourseScreen() {
                 ))}
 
               {!owned && !course.comingSoon && (
-                <Pressable style={styles.button} onPress={() => router.push('/reserve')}>
+                <Pressable style={styles.button} onPress={() => router.push('/pricing')}>
                   <Text style={styles.buttonText}>Get Access — ${course.priceUsd}</Text>
                 </Pressable>
               )}

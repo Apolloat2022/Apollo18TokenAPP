@@ -28,7 +28,7 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
-          name="(tabs)/reserve"
+          name="(tabs)/pricing"
           options={{
             title: 'Pricing',
             tabBarIcon: ({ size, color }) => (
