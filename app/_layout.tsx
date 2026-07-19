@@ -29,7 +29,7 @@ export default function RootLayout() {
         <Tabs.Screen
           name="(tabs)/reserve"
           options={{
-            title: 'Checkout',
+            title: 'Pricing',
             tabBarIcon: ({ size, color }) => (
               <Ionicons name="cart" size={size} color={color} />
             ),

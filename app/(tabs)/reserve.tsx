@@ -115,8 +115,8 @@ function ReserveScreenContent() {
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={styles.title}>Course Checkout</Text>
-            <Text style={styles.subtitle}>Unlock Advanced Prompt Engineering Coursework</Text>
+            <Text style={styles.title}>Pricing</Text>
+            <Text style={styles.subtitle}>Unlock courses and top up your Apollo18 Credits</Text>
           </View>
 
           <View style={styles.progressContainer}>

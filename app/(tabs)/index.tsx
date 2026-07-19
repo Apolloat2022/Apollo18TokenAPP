@@ -17,24 +17,45 @@ export default function HomeScreen() {
             resizeMode="contain"
           />
           <Text style={styles.title}>APOLLO 18</Text>
-          <Text style={styles.heroHeadline}>Unlock the Power of AI. Your Gateway to Advanced Prompt Engineering & Consulting.</Text>
+          <Text style={styles.heroHeadline}>AI usage, tokenized.</Text>
+          <Text style={styles.heroSubheadline}>
+            Buy credits once, spend them across every Apollo18 course and AI tool.
+          </Text>
         </View>
 
         <View style={styles.glassCard}>
           <View style={styles.cardHeader}>
-            <Ionicons name="rocket" size={24} color="#D4AF37" />
-            <Text style={styles.cardTitle}>Prompt Engineering Course</Text>
+            <Ionicons name="school" size={24} color="#D4AF37" />
+            <Text style={styles.cardTitle}>Course Catalog</Text>
           </View>
           <Text style={styles.cardDescription}>
-            Master the art of AI communication. Get certified in advanced prompt engineering and agentic workflows.
+            Certified courses in prompt engineering and agentic AI workflows, with more added over time.
           </Text>
-          
-          <Pressable 
+
+          <Pressable
+            style={styles.button}
+            onPress={() => router.push('/course')}
+          >
+            <Ionicons name="book" size={20} color="#000000" />
+            <Text style={styles.buttonText}>Browse Courses</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.glassCard}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="flash" size={24} color="#D4AF37" />
+            <Text style={styles.cardTitle}>Apollo18 Credits</Text>
+          </View>
+          <Text style={styles.cardDescription}>
+            One prepaid balance for the AI Tutor, the Prompt Playground, and every course purchase.
+          </Text>
+
+          <Pressable
             style={styles.button}
             onPress={() => router.push('/reserve')}
           >
-            <Ionicons name="flash" size={20} color="#000000" />
-            <Text style={styles.buttonText}>Get Full Access</Text>
+            <Ionicons name="card" size={20} color="#000000" />
+            <Text style={styles.buttonText}>Get Credits</Text>
           </Pressable>
         </View>
 
@@ -75,7 +96,8 @@ const styles = StyleSheet.create({
   logo: { width: 100, height: 100, marginBottom: 16 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#D4AF37', textAlign: 'center', letterSpacing: 4, marginBottom: 12 },
   heroHeadline: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', textAlign: 'center', lineHeight: 36, marginBottom: 8, paddingHorizontal: 10 },
-  
+  heroSubheadline: { fontSize: 16, color: '#C5C6C7', textAlign: 'center', lineHeight: 22, marginBottom: 8, paddingHorizontal: 10 },
+
   glassCard: { 
     backgroundColor: 'rgba(31, 40, 51, 0.7)', 
     borderRadius: 24, 
