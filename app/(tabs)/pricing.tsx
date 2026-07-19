@@ -1,11 +1,12 @@
 // app/(tabs)/pricing.tsx
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { SignInPanel } from '../../components/SignInPanel';
 import { createCheckout } from '../../services/api';
+import { notify } from '../../services/notify';
 import { catalog, CatalogItem } from '../../data/catalog';
 import React from 'react';
 
@@ -65,14 +66,14 @@ function PricingScreenContent() {
 
   useEffect(() => {
     if (params.checkout === 'cancelled') {
-      Alert.alert('Checkout Cancelled', 'No charge was made.');
+      notify('Checkout Cancelled', 'No charge was made.');
     }
   }, [params.checkout]);
 
   const startCheckout = async (item: CatalogItem, rail: 'card' | 'eth') => {
     const token = await getToken();
     if (!token) {
-      Alert.alert('Sign In Required', 'Please sign in first.');
+      notify('Sign In Required', 'Please sign in first.');
       return;
     }
 
@@ -81,7 +82,7 @@ function PricingScreenContent() {
       const url = await createCheckout(rail, item.sku, token);
       await goToExternalCheckout(url);
     } catch (error: any) {
-      Alert.alert('Checkout Failed', error?.message || 'Please try again.');
+      notify('Checkout Failed', error?.message || 'Please try again.');
     } finally {
       setPayingSkuRail(null);
     }

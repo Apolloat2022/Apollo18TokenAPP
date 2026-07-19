@@ -1,11 +1,12 @@
 // app/(tabs)/profile.tsx
-import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Alert, Image, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Image, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { SignInPanel } from '../../components/SignInPanel';
 import { fetchDashboard, Purchase } from '../../services/api';
+import { notify } from '../../services/notify';
 
 function processorLabel(p: Purchase['processor']) {
   return p === 'stripe' ? 'Card' : 'ETH';
@@ -41,10 +42,10 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     if (params.checkout === 'success') {
-      Alert.alert('✅ Purchase Successful', 'Your credits or course access will appear below shortly.');
+      notify('✅ Purchase Successful', 'Your credits or course access will appear below shortly.');
       if (isSignedIn) loadDashboard();
     } else if (params.checkout === 'cancelled') {
-      Alert.alert('Checkout Cancelled', 'No charge was made.');
+      notify('Checkout Cancelled', 'No charge was made.');
     }
   }, [params.checkout, isSignedIn, loadDashboard]);
 

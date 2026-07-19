@@ -6,10 +6,11 @@
 // Expo pattern but have NOT been exercised against a live Clerk instance yet —
 // verify this flow end-to-end during the first live test (see PHASE2-HANDOFF).
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSignIn, useSignUp } from '@clerk/clerk-expo';
 import { useAuth } from '../hooks/useAuth';
+import { notify } from '../services/notify';
 
 function ClerkEmailCodeFlow() {
   const { signIn, setActive: setActiveSignIn, isLoaded: signInLoaded } = useSignIn();
@@ -23,7 +24,7 @@ function ClerkEmailCodeFlow() {
 
   const sendCode = async () => {
     if (!email.trim() || !email.includes('@')) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      notify('Invalid Email', 'Please enter a valid email address.');
       return;
     }
     if (!signInLoaded || !signUpLoaded) return;
@@ -48,7 +49,7 @@ function ClerkEmailCodeFlow() {
       }
       setStage('code');
     } catch (err: any) {
-      Alert.alert('Could Not Send Code', err?.errors?.[0]?.message || 'Please try again.');
+      notify('Could Not Send Code', err?.errors?.[0]?.message || 'Please try again.');
     } finally {
       setBusy(false);
     }
@@ -56,7 +57,7 @@ function ClerkEmailCodeFlow() {
 
   const verifyCode = async () => {
     if (!code.trim()) {
-      Alert.alert('Enter Code', 'Please enter the code from your email.');
+      notify('Enter Code', 'Please enter the code from your email.');
       return;
     }
     setBusy(true);
@@ -77,7 +78,7 @@ function ClerkEmailCodeFlow() {
         }
       }
     } catch (err: any) {
-      Alert.alert('Invalid Code', err?.errors?.[0]?.message || 'That code did not work. Try again.');
+      notify('Invalid Code', err?.errors?.[0]?.message || 'That code did not work. Try again.');
     } finally {
       setBusy(false);
     }
