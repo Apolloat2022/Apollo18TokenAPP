@@ -56,21 +56,27 @@ function ClerkEmailCodeFlow() {
   };
 
   const verifyCode = async () => {
-    if (!code.trim()) {
+    // Clerk's email template often displays the code with a space in the
+    // middle for readability (e.g. "123 456"). .trim() only strips leading/
+    // trailing whitespace, so a copy-pasted code with an internal space would
+    // reach Clerk malformed and get rejected every time. Strip everything but
+    // digits instead.
+    const cleanCode = code.replace(/\D/g, '');
+    if (!cleanCode) {
       notify('Enter Code', 'Please enter the code from your email.');
       return;
     }
     setBusy(true);
     try {
       if (mode === 'signIn') {
-        const res = await signIn.attemptFirstFactor({ strategy: 'email_code', code: code.trim() });
+        const res = await signIn.attemptFirstFactor({ strategy: 'email_code', code: cleanCode });
         if (res.status === 'complete') {
           await setActiveSignIn({ session: res.createdSessionId });
         } else {
           throw new Error('Sign-in not complete');
         }
       } else {
-        const res = await signUp.attemptEmailAddressVerification({ code: code.trim() });
+        const res = await signUp.attemptEmailAddressVerification({ code: cleanCode });
         if (res.status === 'complete') {
           await setActiveSignUp({ session: res.createdSessionId });
         } else {
@@ -117,7 +123,7 @@ function ClerkEmailCodeFlow() {
             placeholder="123456"
             placeholderTextColor="#666666"
             value={code}
-            onChangeText={setCode}
+            onChangeText={(text) => setCode(text.replace(/\D/g, ''))}
             keyboardType="number-pad"
           />
           <Pressable style={styles.button} onPress={verifyCode} disabled={busy}>
