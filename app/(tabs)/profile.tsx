@@ -1,63 +1,52 @@
 // app/(tabs)/profile.tsx
-import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Alert, Image, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Alert, Image, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
-import { getCreditBalance, getPurchaseHistory, Purchase } from '../../services/ledger';
+import { SignInPanel } from '../../components/SignInPanel';
+import { fetchDashboard, Purchase } from '../../services/api';
 
 function processorLabel(p: Purchase['processor']) {
   return p === 'stripe' ? 'Card' : 'ETH';
 }
 
 export default function DashboardScreen() {
-  const { session, email, signInWithEmail, signOut } = useAuth();
+  const { isSignedIn, email, getToken, signOut } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams<{ checkout?: string }>();
-
-  const [signInEmail, setSignInEmail] = useState('');
-  const [isSendingLink, setIsSendingLink] = useState(false);
-  const [linkSent, setLinkSent] = useState(false);
 
   const [balance, setBalance] = useState<number | null>(null);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
   const loadDashboard = useCallback(async () => {
+    const token = await getToken();
+    if (!token) return;
     setLoadingData(true);
-    const [b, p] = await Promise.all([getCreditBalance(), getPurchaseHistory()]);
-    setBalance(b);
-    setPurchases(p);
-    setLoadingData(false);
-  }, []);
+    try {
+      const data = await fetchDashboard(token);
+      setBalance(data.balance);
+      setPurchases(data.purchases);
+    } catch (err) {
+      console.error('Failed to load dashboard:', err);
+    } finally {
+      setLoadingData(false);
+    }
+  }, [getToken]);
 
   useEffect(() => {
-    if (session) loadDashboard();
-  }, [session, loadDashboard]);
+    if (isSignedIn) loadDashboard();
+  }, [isSignedIn, loadDashboard]);
 
   useEffect(() => {
     if (params.checkout === 'success') {
       Alert.alert('✅ Purchase Successful', 'Your credits or course access will appear below shortly.');
-      if (session) loadDashboard();
+      if (isSignedIn) loadDashboard();
     } else if (params.checkout === 'cancelled') {
       Alert.alert('Checkout Cancelled', 'No charge was made.');
     }
-  }, [params.checkout, session, loadDashboard]);
-
-  const sendMagicLink = async () => {
-    if (!signInEmail.trim() || !signInEmail.includes('@')) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
-      return;
-    }
-    setIsSendingLink(true);
-    try {
-      const { error } = await signInWithEmail(signInEmail.trim());
-      if (error) Alert.alert('Could Not Send Link', error);
-      else setLinkSent(true);
-    } finally {
-      setIsSendingLink(false);
-    }
-  };
+  }, [params.checkout, isSignedIn, loadDashboard]);
 
   const contactEmail = () => Linking.openURL('mailto:Info@apollo18token.com');
   const contactPhone = () => Linking.openURL('tel:+14695509909');
@@ -76,36 +65,8 @@ export default function DashboardScreen() {
           <Text style={styles.subtitle}>DASHBOARD</Text>
         </View>
 
-        {!session ? (
-          <View style={styles.glassCard}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="mail" size={24} color="#D4AF37" />
-              <Text style={styles.cardTitle}>Sign In</Text>
-            </View>
-            {linkSent ? (
-              <Text style={styles.paragraph}>
-                Check your email for a sign-in link — open it on this device to continue.
-              </Text>
-            ) : (
-              <>
-                <Text style={styles.paragraph}>
-                  Sign in to see your Apollo18 Credits balance, purchase history, and course access.
-                </Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="your.email@example.com"
-                  placeholderTextColor="#666666"
-                  value={signInEmail}
-                  onChangeText={setSignInEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-                <Pressable style={styles.button} onPress={sendMagicLink} disabled={isSendingLink}>
-                  {isSendingLink ? <ActivityIndicator color="#000000" /> : <Text style={styles.buttonText}>Send Sign-In Link</Text>}
-                </Pressable>
-              </>
-            )}
-          </View>
+        {!isSignedIn ? (
+          <SignInPanel />
         ) : (
           <>
             <View style={styles.glassCard}>
@@ -139,7 +100,7 @@ export default function DashboardScreen() {
                       <Text style={styles.purchaseSku}>{p.sku}</Text>
                       <Text style={styles.purchaseDate}>{new Date(p.created_at).toLocaleDateString()}</Text>
                     </View>
-                    <Text style={styles.purchaseAmount}>${p.amount_usd.toFixed(2)}</Text>
+                    <Text style={styles.purchaseAmount}>${Number(p.amount_usd).toFixed(2)}</Text>
                     <Text style={styles.purchaseRail}>{processorLabel(p.processor)}</Text>
                   </View>
                 ))
@@ -189,7 +150,6 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 },
   cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#D4AF37' },
   balanceText: { fontSize: 32, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 8 },
-  input: { backgroundColor: '#1F2833', borderRadius: 12, padding: 16, color: '#FFFFFF', marginBottom: 16, borderWidth: 1, borderColor: '#D4AF37' },
   button: { flexDirection: 'row', backgroundColor: '#D4AF37', paddingVertical: 14, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   buttonText: { color: '#000000', fontSize: 15, fontWeight: 'bold' },
   secondaryButton: { flexDirection: 'row', gap: 8, backgroundColor: 'transparent', paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#D4AF37', marginBottom: 20 },

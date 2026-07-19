@@ -4,7 +4,7 @@
 // talks only to Coinbase's hosted checkout page we redirect them to.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getServerSku } from './_lib/skus';
-import { getUserIdFromToken } from './_lib/supabase';
+import { getClerkUserId } from './_lib/auth';
 
 const COMMERCE_API = 'https://api.commerce.coinbase.com/charges';
 const API_KEY = process.env.COINBASE_COMMERCE_API_KEY ?? '';
@@ -24,13 +24,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'ETH payments unavailable' });
   }
 
-  // 1. Authenticate the caller from their Supabase session token.
-  const auth = req.headers.authorization ?? '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  if (!token) return res.status(401).json({ error: 'Not signed in' });
-
-  const userId = await getUserIdFromToken(token);
-  if (!userId) return res.status(401).json({ error: 'Invalid session' });
+  // 1. Authenticate the caller from their Clerk session token.
+  const userId = await getClerkUserId(req.headers.authorization);
+  if (!userId) return res.status(401).json({ error: 'Not signed in' });
 
   // 2. Validate the requested SKU server-side. The USD price comes from our
   //    server map, never from the client.

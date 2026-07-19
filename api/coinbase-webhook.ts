@@ -9,7 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'crypto';
 import { getServerSku } from './_lib/skus';
-import { supabaseAdmin } from './_lib/supabase';
+import { fulfillPurchase } from './_lib/fulfill';
 import { readRawBody } from './_lib/rawBody';
 
 const WEBHOOK_SECRET = process.env.COINBASE_COMMERCE_WEBHOOK_SECRET ?? '';
@@ -80,22 +80,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const amountUsd = Number(charge?.pricing?.local?.amount ?? serverSku.priceUsd);
 
   // 3. Atomic + idempotent fulfillment, keyed on (coinbase, chargeId).
-  const { data: fulfilled, error } = await supabaseAdmin.rpc('fulfill_purchase', {
-    p_user_id: userId,
-    p_processor: 'coinbase',
-    p_reference: chargeId,
-    p_event_id: event.id ?? null,
-    p_sku: sku,
-    p_kind: serverSku.kind,
-    p_amount_usd: amountUsd,
-    p_credits: serverSku.credits ?? 0,
-  });
-
-  if (error) {
+  try {
+    const fulfilled = await fulfillPurchase({
+      userId,
+      processor: 'coinbase',
+      reference: chargeId,
+      eventId: event.id ?? null,
+      sku,
+      kind: serverSku.kind,
+      amountUsd,
+      credits: serverSku.credits ?? 0,
+    });
+    return res.status(200).json({ received: true, newlyFulfilled: fulfilled });
+  } catch (err) {
     // Return 500 so Coinbase retries — fulfillment is safe to repeat.
-    console.error('fulfill_purchase failed:', error);
+    console.error('fulfill_purchase failed:', err);
     return res.status(500).json({ error: 'Fulfillment failed' });
   }
-
-  return res.status(200).json({ received: true, newlyFulfilled: fulfilled === true });
 }

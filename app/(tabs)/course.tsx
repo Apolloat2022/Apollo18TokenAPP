@@ -5,12 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { catalog, CourseItem } from '../../data/catalog';
 import { useAuth } from '../../hooks/useAuth';
-import { getOwnedCourseSkus } from '../../services/ledger';
+import { fetchDashboard } from '../../services/api';
 
 const courses = catalog.filter((item): item is CourseItem => item.type === 'course');
 
 export default function CourseScreen() {
-  const { session } = useAuth();
+  const { isSignedIn, getToken } = useAuth();
   const [ownedSkus, setOwnedSkus] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCredentialModal, setShowCredentialModal] = useState(false);
@@ -23,7 +23,7 @@ export default function CourseScreen() {
 
     const checkAccess = async () => {
       setLoading(true);
-      if (!session) {
+      if (!isSignedIn) {
         // Signed-out visitors own nothing; every course shows as locked.
         if (!cancelled) {
           setOwnedSkus([]);
@@ -31,16 +31,21 @@ export default function CourseScreen() {
         }
         return;
       }
-      const skus = await getOwnedCourseSkus();
-      if (!cancelled) {
-        setOwnedSkus(skus);
-        setLoading(false);
+      try {
+        const token = await getToken();
+        const skus = token ? (await fetchDashboard(token)).entitlements : [];
+        if (!cancelled) setOwnedSkus(skus);
+      } catch (err) {
+        console.error('Failed to load entitlements:', err);
+        if (!cancelled) setOwnedSkus([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
 
     checkAccess();
     return () => { cancelled = true; };
-  }, [session]);
+  }, [isSignedIn, getToken]);
 
   const claimCredential = (moduleName: string) => {
     setLastCompletedModule(moduleName);
@@ -62,7 +67,7 @@ export default function CourseScreen() {
           <Text style={styles.courseBadge}>APOLLO18 ACADEMY</Text>
           <Text style={styles.title}>Course Catalog</Text>
           <Text style={styles.subtitle}>One credits balance, every Apollo course</Text>
-          {!session && (
+          {!isSignedIn && (
             <Text style={[styles.subtitle, { color: '#00A896', marginTop: 8 }]}>
               Sign in on the Dashboard tab to unlock courses you've purchased.
             </Text>

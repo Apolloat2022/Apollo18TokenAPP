@@ -9,7 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { getServerSku } from './_lib/skus';
-import { supabaseAdmin } from './_lib/supabase';
+import { fulfillPurchase } from './_lib/fulfill';
 import { readRawBody } from './_lib/rawBody';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
@@ -72,22 +72,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // 3. Atomic + idempotent fulfillment. Keyed on (stripe, session.id) so a
   //    redelivered event does nothing.
-  const { data: fulfilled, error } = await supabaseAdmin.rpc('fulfill_purchase', {
-    p_user_id: userId,
-    p_processor: 'stripe',
-    p_reference: session.id,
-    p_event_id: event.id,
-    p_sku: sku,
-    p_kind: serverSku.kind,
-    p_amount_usd: amountUsd,
-    p_credits: serverSku.credits ?? 0,
-  });
-
-  if (error) {
+  try {
+    const fulfilled = await fulfillPurchase({
+      userId,
+      processor: 'stripe',
+      reference: session.id,
+      eventId: event.id,
+      sku,
+      kind: serverSku.kind,
+      amountUsd,
+      credits: serverSku.credits ?? 0,
+    });
+    return res.status(200).json({ received: true, newlyFulfilled: fulfilled });
+  } catch (err) {
     // Return 500 so Stripe retries — the operation is safe to repeat.
-    console.error('fulfill_purchase failed:', error);
+    console.error('fulfill_purchase failed:', err);
     return res.status(500).json({ error: 'Fulfillment failed' });
   }
-
-  return res.status(200).json({ received: true, newlyFulfilled: fulfilled === true });
 }

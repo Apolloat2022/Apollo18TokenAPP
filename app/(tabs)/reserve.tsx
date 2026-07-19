@@ -1,9 +1,11 @@
 // app/(tabs)/reserve.tsx
-import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
+import { SignInPanel } from '../../components/SignInPanel';
+import { createCheckout } from '../../services/api';
 import { catalog, CatalogItem } from '../../data/catalog';
 import React from 'react';
 
@@ -57,11 +59,8 @@ async function goToExternalCheckout(url: string) {
 }
 
 function ReserveScreenContent() {
-  const { session, email: authedEmail, accessToken, signInWithEmail } = useAuth();
+  const { isSignedIn, email, getToken } = useAuth();
   const params = useLocalSearchParams<{ checkout?: string }>();
-  const [email, setEmail] = useState('');
-  const [isSendingLink, setIsSendingLink] = useState(false);
-  const [linkSent, setLinkSent] = useState(false);
   const [payingSkuRail, setPayingSkuRail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,57 +69,23 @@ function ReserveScreenContent() {
     }
   }, [params.checkout]);
 
-  const sendMagicLink = async () => {
-    if (!email.trim() || !email.includes('@')) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
-      return;
-    }
-
-    setIsSendingLink(true);
-    try {
-      const { error } = await signInWithEmail(email.trim());
-      if (error) {
-        Alert.alert('Could Not Send Link', error);
-      } else {
-        setLinkSent(true);
-      }
-    } finally {
-      setIsSendingLink(false);
-    }
-  };
-
   const startCheckout = async (item: CatalogItem, rail: 'card' | 'eth') => {
-    if (!accessToken) {
-      Alert.alert('Sign In Required', 'Please verify your email first.');
+    const token = await getToken();
+    if (!token) {
+      Alert.alert('Sign In Required', 'Please sign in first.');
       return;
     }
 
     setPayingSkuRail(`${item.sku}:${rail}`);
     try {
-      const endpoint = rail === 'card' ? '/api/checkout' : '/api/eth-checkout';
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ sku: item.sku }),
-      });
-
-      const json = await response.json();
-      if (!response.ok || !json.url) {
-        throw new Error(json.error || 'Checkout could not be started');
-      }
-
-      await goToExternalCheckout(json.url);
+      const url = await createCheckout(rail, item.sku, token);
+      await goToExternalCheckout(url);
     } catch (error: any) {
       Alert.alert('Checkout Failed', error?.message || 'Please try again.');
     } finally {
       setPayingSkuRail(null);
     }
   };
-
-  const signedIn = !!session;
 
   return (
     <View style={styles.container}>
@@ -137,46 +102,15 @@ function ReserveScreenContent() {
             <Text style={styles.subtitle}>Unlock courses and top up your Apollo18 Credits</Text>
           </View>
 
-          {!signedIn ? (
-            <View style={styles.glassCard}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="mail" size={24} color="#D4AF37" />
-                <Text style={styles.cardTitle}>Sign In to Continue</Text>
-              </View>
-              {linkSent ? (
-                <View style={styles.infoBox}>
-                  <Text style={styles.infoTitle}>Check Your Email</Text>
-                  <Text style={styles.infoText}>
-                    We sent a sign-in link to {email}. Open it on this device to continue.
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.cardDescription}>
-                    We'll email you a one-time sign-in link — no password needed.
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="your.email@example.com"
-                    placeholderTextColor="#666666"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                  <Pressable style={styles.button} onPress={sendMagicLink} disabled={isSendingLink}>
-                    {isSendingLink ? <ActivityIndicator color="#000000" /> : <Text style={styles.buttonText}>Send Sign-In Link</Text>}
-                  </Pressable>
-                </>
-              )}
-            </View>
+          {!isSignedIn ? (
+            <SignInPanel />
           ) : (
             <View style={styles.glassCard}>
               <View style={styles.cardHeader}>
                 <Ionicons name="card" size={24} color="#D4AF37" />
                 <Text style={styles.cardTitle}>Choose Package</Text>
               </View>
-              <Text style={styles.cardDescription}>Signed in as {authedEmail}</Text>
+              <Text style={styles.cardDescription}>Signed in as {email}</Text>
 
               {catalog.filter((item) => !item.comingSoon).map((item) => {
                 const cardBusy = payingSkuRail === `${item.sku}:card`;
@@ -247,7 +181,6 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 },
   cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#D4AF37' },
   cardDescription: { fontSize: 14, color: '#C5C6C7', marginBottom: 16 },
-  input: { backgroundColor: '#1F2833', borderRadius: 12, padding: 16, color: '#FFFFFF', marginBottom: 16, borderWidth: 1, borderColor: '#D4AF37' },
   button: { backgroundColor: '#D4AF37', paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   buttonText: { color: '#000000', fontSize: 16, fontWeight: 'bold' },
   packageCard: {
@@ -265,7 +198,4 @@ const styles = StyleSheet.create({
   railButtons: { flexDirection: 'row', gap: 8 },
   railButton: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#0B0C10', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.3)' },
   railHint: { color: '#C5C6C7', fontSize: 11, textAlign: 'center', marginTop: 4, opacity: 0.7 },
-  infoBox: { backgroundColor: 'rgba(0, 168, 150, 0.1)', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#00A896' },
-  infoTitle: { color: '#00A896', fontWeight: 'bold', marginBottom: 8 },
-  infoText: { color: '#FFFFFF', fontSize: 14 },
 });

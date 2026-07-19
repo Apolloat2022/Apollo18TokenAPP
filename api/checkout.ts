@@ -3,7 +3,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { getServerSku } from './_lib/skus';
-import { getUserIdFromToken } from './_lib/supabase';
+import { getClerkUserId } from './_lib/auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
   apiVersion: '2025-02-24.acacia',
@@ -21,13 +21,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // 1. Authenticate the caller from their Supabase session token.
-  const auth = req.headers.authorization ?? '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  if (!token) return res.status(401).json({ error: 'Not signed in' });
-
-  const userId = await getUserIdFromToken(token);
-  if (!userId) return res.status(401).json({ error: 'Invalid session' });
+  // 1. Authenticate the caller from their Clerk session token.
+  const userId = await getClerkUserId(req.headers.authorization);
+  if (!userId) return res.status(401).json({ error: 'Not signed in' });
 
   // 2. Validate the requested SKU server-side.
   const sku = typeof req.body?.sku === 'string' ? req.body.sku : '';
